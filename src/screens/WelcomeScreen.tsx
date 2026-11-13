@@ -11,6 +11,7 @@ export function WelcomeScreen({ onStart, onSignIn }: { onStart: () => void; onSi
   const { t, settings } = useApp();
   const { width } = useWindowDimensions();
   const compact = width < 420;
+  const tiny = width < 360;
   const float = useRef(new Animated.Value(0)).current;
   const pop = useRef(new Animated.Value(0)).current;
 
@@ -49,10 +50,10 @@ export function WelcomeScreen({ onStart, onSignIn }: { onStart: () => void; onSi
           </Animated.View>
 
           <Animated.View style={[styles.mascots, { transform: [{ translateY }] }]}>
-            <Text style={styles.mascotBig}>🦊</Text>
-            <Text style={styles.mascotSmall}>🐼</Text>
-            <Text style={styles.mascotBig}>🦄</Text>
-            <Text style={styles.mascotSmall}>🐙</Text>
+            <Text style={[styles.mascotBig, tiny && { fontSize: 54 }]}>🦊</Text>
+            <Text style={[styles.mascotSmall, tiny && { fontSize: 38 }]}>🐼</Text>
+            <Text style={[styles.mascotBig, tiny && { fontSize: 54 }]}>🦄</Text>
+            <Text style={[styles.mascotSmall, tiny && { fontSize: 38 }]}>🐙</Text>
           </Animated.View>
 
           <View style={styles.sparkles} pointerEvents="none">
@@ -75,7 +76,7 @@ export function WelcomeScreen({ onStart, onSignIn }: { onStart: () => void; onSi
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, overflow: 'hidden' },
   safe: { flex: 1 },
   halo: {
     position: 'absolute',

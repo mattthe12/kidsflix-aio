@@ -108,7 +108,7 @@ export function ParentDashboardScreen() {
     if (result.ok) {
       setTestEmailState('success');
       setTestEmailMessage(
-        `Resend accepted the test email for ${result.recipientMasked ?? account?.email ?? 'the registered parent'}. Check the inbox and Spam folder. Delivery is marked delivered only when Resend reports it.`
+        `Gmail accepted the test email for ${result.recipientMasked ?? account?.email ?? 'the registered parent'}. Check the inbox and Spam folder. Gmail SMTP does not provide delivery receipts, so delivery status cannot be confirmed here.`
       );
     } else {
       setTestEmailState('error');
@@ -591,7 +591,7 @@ export function ParentDashboardScreen() {
               {testEmailState === 'sending' ? (
                 <View style={styles.securityLoading}>
                   <ActivityIndicator size="small" color={colors.white} />
-                  <Text style={styles.securityMeta}>Contacting Resend…</Text>
+                  <Text style={styles.securityMeta}>Contacting Gmail…</Text>
                 </View>
               ) : null}
               {testEmailState !== 'idle' && testEmailState !== 'sending' && testEmailMessage ? (
@@ -616,7 +616,7 @@ export function ParentDashboardScreen() {
                         <Text style={styles.diagnosticMeta} numberOfLines={2}>
                           {new Date(alert.eventAt).toLocaleString()} · {alert.recipientMasked || 'registered parent email'}
                           {alert.attemptCount > 1 ? ` · attempt ${alert.attemptCount}` : ''}
-                          {alert.deliveredAt ? ' · delivered' : alert.status === 'accepted' ? ' · accepted by Resend' : ''}
+                          {alert.deliveredAt ? ' · delivered' : alert.status === 'accepted' ? ' · accepted by Gmail' : ''}
                         </Text>
                         {alert.errorMessage ? (
                           <Text style={styles.diagnosticError} numberOfLines={2}>{alert.errorMessage}</Text>

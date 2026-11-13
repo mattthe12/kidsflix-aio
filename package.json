@@ -37,7 +37,8 @@
     "dev": "expo start",
     "typecheck": "tsc --noEmit",
     "test:pin": "node --test scripts/pin-lockout.test.mjs",
-    "test": "npm run typecheck && npm run test:pin"
+    "test:auth": "node --experimental-strip-types --test scripts/auth-rules.test.mjs",
+    "test": "npm run typecheck && npm run test:auth && npm run test:pin"
   },
   "private": true
 }

@@ -1,4 +1,8 @@
-// Supabase Edge Function: receive Resend delivery events for security emails.
+// Legacy Supabase Edge Function: receive Resend delivery events for security emails.
+//
+// Gmail SMTP does not emit delivery events, so this function is no longer used by
+// the current single-sender setup. It is kept only so an existing deployed Resend
+// webhook fails closed; do not configure a new webhook.
 //
 // Secret: RESEND_WEBHOOK_SECRET (the whsec_... signing secret from the Resend
 // webhook settings). Configure the endpoint in Resend as:

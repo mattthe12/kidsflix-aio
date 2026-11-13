@@ -20,6 +20,8 @@ import { colors, font, gradients } from './src/theme';
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
+import { AdminPasswordChangeScreen } from './src/screens/AdminPasswordChangeScreen';
+import { AdminDashboardScreen } from './src/screens/AdminDashboardScreen';
 import { PinSetupScreen } from './src/screens/PinSetupScreen';
 import { ProfilePickerScreen } from './src/screens/ProfilePickerScreen';
 import { ProfileFormScreen } from './src/screens/ProfileFormScreen';
@@ -71,7 +73,7 @@ function TabScreens() {
 }
 
 function Root() {
-  const { ready, recovery, account, settings, profiles, profile, parentUnlocked, lockParent } = useApp();
+  const { ready, recovery, admin, account, settings, profiles, profile, parentUnlocked, lockParent } = useApp();
   const nav = useNav();
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
 
@@ -93,6 +95,8 @@ function Root() {
 
   if (!ready) return <Splash />;
   if (recovery) return <ResetPasswordScreen />;
+  if (admin?.mustChangePassword) return <AdminPasswordChangeScreen />;
+  if (admin) return <AdminDashboardScreen />;
 
   if (!account) {
     if (!authMode) {

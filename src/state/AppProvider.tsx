@@ -13,6 +13,11 @@ import type {
 } from '../types';
 import { allTitles, maxRatingForAge, recommendedFor, titleById, getEpisode } from '../data/catalog';
 import { authApi, hashPin, type AuthUser } from '../lib/auth';
+import {
+  completeAdminBootstrap,
+  loadAdminSession,
+  type AdminSession,
+} from '../lib/admin';
 import { pinSecurity } from '../lib/pinSecurity';
 import { emptyPinAttemptResult, type PinAttemptResult } from '../lib/pinLockout';
 import { remote } from '../lib/remote';
@@ -39,14 +44,16 @@ interface AppContextValue {
   profile: Profile | null;
   isDemo: boolean;
   recovery: boolean;
+  admin: AdminSession | null;
   t: (key: string) => string;
   parentUnlocked: boolean;
 
-  signUp: (email: string, password: string, name: string) => Promise<{ error?: string; needsEmailConfirm?: boolean }>;
-  signIn: (email: string, password: string) => Promise<{ error?: string; needsEmailConfirm?: boolean }>;
+  signUp: (email: string, password: string, name: string) => Promise<{ error?: string; needsEmailConfirm?: boolean; message?: string }>;
+  signIn: (email: string, password: string) => Promise<{ error?: string; needsEmailConfirm?: boolean; message?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ ok: boolean; message: string }>;
   finishPasswordReset: (password: string) => Promise<{ ok: boolean; message: string }>;
+  finishAdminBootstrap: (password: string) => Promise<{ ok: boolean; message: string }>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; message: string }>;
 
   selectProfile: (id: string) => void;
@@ -117,6 +124,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [account, setAccount] = useState<AuthUser | null>(null);
   const [family, setFamily] = useState<FamilyData | null>(null);
   const [recovery, setRecovery] = useState(false);
+  const [admin, setAdmin] = useState<AdminSession | null>(null);
   const [unlockedAt, setUnlockedAt] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const progressThrottle = useRef<Record<string, number>>({});
@@ -131,6 +139,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const recoveryUser = await authApi.consumeRecoveryLink();
         const user = recoveryUser ?? (await authApi.restore());
         if (!user) return;
+        const adminSession = await loadAdminSession(user.id);
         let fam = await loadFamily(user.id, user.email);
         const pulled = await remote.pull(user.id);
         if (pulled) {
@@ -149,10 +158,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (!alive) return;
         setAccount(user);
         setFamily(fam);
+        setAdmin(adminSession);
         setRecovery(Boolean(recoveryUser));
         // If a previous lockout alert failed (or the app closed before the
         // request finished), the server retries only an eligible event after
-        // its backoff. Resend's idempotency key prevents duplicate emails.
+        // its backoff. The event id prevents duplicate emails.
         void pinSecurity.retryPendingAlerts();
       } catch (err) {
         console.warn('[kidflix] boot failed', err);
@@ -190,9 +200,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   /* ── auth ─────────────────────────────────────────────────────────────── */
   const completeAuth = useCallback(async (user: AuthUser) => {
     await authApi.persistSession(user);
-    const fam = await loadFamily(user.id, user.email);
+    const [fam, adminSession] = await Promise.all([
+      loadFamily(user.id, user.email),
+      loadAdminSession(user.id),
+    ]);
     setAccount(user);
     setFamily(fam);
+    setAdmin(adminSession);
     setRecovery(false);
     setUnlockedAt(0);
   }, []);
@@ -200,8 +214,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signUp = useCallback(
     async (email: string, password: string, name: string) => {
       const res = await authApi.signUp(email, password, name);
-      if (res.needsEmailConfirm) return { needsEmailConfirm: true };
-      if (!res.user) return { error: res.error ?? 'unknown' };
+      if (res.needsEmailConfirm) return { needsEmailConfirm: true, message: res.message };
+      if (!res.user) return { error: res.error ?? 'unknown', message: res.message };
       await completeAuth(res.user);
       return {};
     },
@@ -211,7 +225,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signIn = useCallback(
     async (email: string, password: string) => {
       const res = await authApi.signIn(email, password);
-      if (!res.user) return { error: res.error ?? 'unknown' };
+      if (!res.user) return { error: res.error ?? 'unknown', message: res.message };
       await completeAuth(res.user);
       return {};
     },
@@ -222,6 +236,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await authApi.signOut();
     setAccount(null);
     setFamily(null);
+    setAdmin(null);
     setRecovery(false);
     setUnlockedAt(0);
   }, []);
@@ -231,10 +246,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const finishPasswordReset = useCallback(
     async (password: string) => {
       const result = await authApi.updatePassword(password);
-      if (result.ok) setRecovery(false);
+      if (result.ok) {
+        setRecovery(false);
+        if (account) setAdmin(await loadAdminSession(account.id));
+      }
       return result;
     },
-    []
+    [account]
+  );
+
+  const finishAdminBootstrap = useCallback(
+    async (password: string) => {
+      const result = await authApi.updatePassword(password);
+      if (!result.ok) return result;
+      const completed = await completeAdminBootstrap();
+      if (!completed.ok) return completed;
+      if (account) setAdmin(await loadAdminSession(account.id));
+      return { ok: true, message: 'Your administrator password is set.' };
+    },
+    [account]
   );
 
   const changePassword = useCallback(
@@ -712,6 +742,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     profile,
     isDemo: !isSupabaseConfigured,
     recovery,
+    admin,
     t,
     parentUnlocked,
     signUp,
@@ -719,6 +750,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     signOut,
     resetPassword,
     finishPasswordReset,
+    finishAdminBootstrap,
     changePassword,
     selectProfile,
     addProfile,

@@ -1,16 +1,24 @@
 // Supabase Edge Function: email a parent after a PIN lockout.
 //
+// Mail is sent through the same single Gmail sender used by Supabase Auth.
+// No custom domain or third-party email account is required.
+//
 // Required function secrets:
-//   RESEND_API_KEY          Resend API key (never put this in the browser)
-//   SECURITY_ALERT_FROM     verified sender, e.g. "KidsFlix Security <security@example.com>"
+//   SMTP_USERNAME           the Gmail address that sends the alert
+//   SMTP_PASSWORD           a Gmail app password (2-Step Verification required)
+//   SECURITY_ALERT_FROM     the same address, optionally with a display name
 // Optional:
+//   SMTP_HOST               defaults to smtp.gmail.com
+//   SMTP_PORT               defaults to 465 (Supabase blocks ports 25 and 587)
+//   SMTP_SECURE             defaults to true
 //   SECURITY_ALERT_REPLY_TO support@example.com
 //
 // The recipient always comes from the authenticated Supabase user. The client
 // never supplies an email address, PIN, PIN hash, token or API key. The database
-// event id is the idempotency key, so retries do not produce duplicate emails.
+// event id is the deduplication key, so retries are less likely to duplicate mail.
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@^9';
 
 const cors = {
   'Access-Control-Allow-Origin': '*',
@@ -76,14 +84,6 @@ function formatEventTime(value: unknown): string {
   }
 }
 
-function safeProviderResponse(response: Response, body: Record<string, unknown>) {
-  return {
-    httpStatus: response.status,
-    id: typeof body.id === 'string' ? body.id : null,
-    name: typeof body.name === 'string' ? body.name.slice(0, 100) : null,
-  };
-}
-
 type AlertEvent = {
   id: string;
   eventAt: string;
@@ -118,11 +118,16 @@ Deno.serve(async (req) => {
     return json({ ok: false, error: 'Sign in as a parent with a registered email first.' }, 401);
   }
 
-  const resendKey = Deno.env.get('RESEND_API_KEY')?.trim();
+  const smtpHost = Deno.env.get('SMTP_HOST')?.trim() || 'smtp.gmail.com';
+  const smtpPort = Number(Deno.env.get('SMTP_PORT')?.trim() || 465);
+  const smtpSecure = (Deno.env.get('SMTP_SECURE')?.trim() || 'true').toLowerCase() !== 'false';
+  const smtpUser = Deno.env.get('SMTP_USERNAME')?.trim();
+  const smtpPass = Deno.env.get('SMTP_PASSWORD')?.trim();
   const from = Deno.env.get('SECURITY_ALERT_FROM')?.trim();
-  if (!resendKey || !from) {
-    console.error('[pin-security-alert] Resend secrets are missing', {
-      hasResendKey: Boolean(resendKey),
+  if (!smtpUser || !smtpPass || !from) {
+    console.error('[pin-security-alert] Gmail SMTP secrets are missing', {
+      hasUsername: Boolean(smtpUser),
+      hasPassword: Boolean(smtpPass),
       hasFrom: Boolean(from),
       recipient: maskEmail(user.email),
     });
@@ -131,7 +136,7 @@ Deno.serve(async (req) => {
         ok: false,
         code: 'not_configured',
         error:
-          'Email alerts are not configured. Add RESEND_API_KEY and SECURITY_ALERT_FROM as Supabase Edge Function secrets.',
+          'Email alerts are not configured. Add SMTP_USERNAME, SMTP_PASSWORD and SECURITY_ALERT_FROM as Supabase Edge Function secrets.',
       },
       503
     );
@@ -144,7 +149,18 @@ Deno.serve(async (req) => {
       {
         ok: false,
         code: 'not_configured',
-        error: 'SECURITY_ALERT_FROM must be a valid sender address, for example KidsFlix Security <security@example.com>.',
+        error: 'SECURITY_ALERT_FROM must be a valid sender address, for example KidsFlix.Aio Security <parent@gmail.com>.',
+      },
+      503
+    );
+  }
+  if (fromAddress.toLowerCase() !== smtpUser.toLowerCase()) {
+    console.error('[pin-security-alert] SECURITY_ALERT_FROM must match SMTP_USERNAME for Gmail');
+    return json(
+      {
+        ok: false,
+        code: 'not_configured',
+        error: 'SECURITY_ALERT_FROM must be the same Gmail address as SMTP_USERNAME.',
       },
       503
     );
@@ -321,88 +337,46 @@ Deno.serve(async (req) => {
     </div>`;
 
   const replyTo = Deno.env.get('SECURITY_ALERT_REPLY_TO')?.trim();
-  const idempotencyKey = `kidsflix-security/${event.id}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 12_000);
+  const transport = nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpSecure,
+    auth: { user: smtpUser, pass: smtpPass },
+    connectionTimeout: 12_000,
+    greetingTimeout: 12_000,
+    socketTimeout: 15_000,
+  });
 
-  let response: Response;
+  let info: { messageId?: string; response?: string; accepted?: unknown[]; rejected?: unknown[] };
   try {
-    response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        'Content-Type': 'application/json',
-        'Idempotency-Key': idempotencyKey,
-      },
-      body: JSON.stringify({
-        from,
-        to: [recipient],
-        subject,
-        text,
-        html,
-        ...(replyTo ? { reply_to: replyTo } : {}),
-      }),
-      signal: controller.signal,
+    info = await transport.sendMail({
+      from,
+      to: recipient,
+      subject,
+      text,
+      html,
+      ...(replyTo ? { replyTo } : {}),
+      // Gmail does not provide an idempotency key. Reusing the event id in the
+      // Message-ID gives retries the best chance of being treated as duplicates.
+      messageId: `<kidsflix-${event.id}@gmail.com>`,
+      headers: { 'X-KidsFlix-Event': event.id },
     });
   } catch (error) {
-    const message = error instanceof Error && error.name === 'AbortError'
-      ? 'Resend did not respond within 12 seconds.'
-      : 'Could not reach Resend. Check the function network logs and try again.';
-    console.error('[pin-security-alert] provider request failed', {
+    const code = String((error as { code?: string }).code ?? 'smtp_error').slice(0, 100);
+    const message = sanitizeProviderMessage(
+      error instanceof Error ? error.message : 'Gmail rejected the email.'
+    ).slice(0, 2000);
+    console.error('[pin-security-alert] SMTP send failed', {
       eventId: event.id,
       recipient: event.recipientMasked,
-      code: 'network_error',
+      code,
     });
     const recorded = await recordResult(supabase, {
       eventId: event.id,
       accepted: false,
-      code: 'network_error',
+      code,
       message,
       retryAfterSeconds: 30,
-    });
-    return json(
-      {
-        ok: false,
-        code: 'network_error',
-        error: message,
-        eventId: event.id,
-        recipientMasked: event.recipientMasked,
-        retryable: true,
-        diagnosticsRecorded: recorded,
-      },
-      502
-    );
-  } finally {
-    clearTimeout(timeout);
-  }
-
-  const raw = await response.text();
-  let providerBody: Record<string, unknown> = {};
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === 'object') providerBody = parsed as Record<string, unknown>;
-  } catch {
-    providerBody = {};
-  }
-
-  if (!response.ok) {
-    const code = String(providerBody.name ?? `http_${response.status}`).slice(0, 100);
-    const message = sanitizeProviderMessage(
-      String(providerBody.message ?? `Resend rejected the email with HTTP ${response.status}.`)
-    ).slice(0, 2000);
-    console.error('[pin-security-alert] provider rejected', {
-      eventId: event.id,
-      recipient: event.recipientMasked,
-      httpStatus: response.status,
-      code,
-    });
-    const recorded = await recordResult(supabase, {
-      eventId: event.id,
-      accepted: false,
-      providerResponse: safeProviderResponse(response, providerBody),
-      code,
-      message,
-      retryAfterSeconds: response.status === 429 ? 120 : 30,
     });
     return json(
       {
@@ -411,36 +385,6 @@ Deno.serve(async (req) => {
         error: message,
         eventId: event.id,
         recipientMasked: event.recipientMasked,
-        retryable: response.status === 429 || response.status >= 500,
-        diagnosticsRecorded: recorded,
-      },
-      502
-    );
-  }
-
-  const providerMessageId = typeof providerBody.id === 'string' ? providerBody.id : '';
-  if (!providerMessageId) {
-    const message = 'Resend returned success without a message id; delivery cannot be confirmed.';
-    console.error('[pin-security-alert] provider response had no id', {
-      eventId: event.id,
-      recipient: event.recipientMasked,
-      httpStatus: response.status,
-    });
-    const recorded = await recordResult(supabase, {
-      eventId: event.id,
-      accepted: false,
-      providerResponse: safeProviderResponse(response, providerBody),
-      code: 'missing_provider_id',
-      message,
-      retryAfterSeconds: 30,
-    });
-    return json(
-      {
-        ok: false,
-        code: 'missing_provider_id',
-        error: message,
-        eventId: event.id,
-        recipientMasked: event.recipientMasked,
         retryable: true,
         diagnosticsRecorded: recorded,
       },
@@ -448,14 +392,21 @@ Deno.serve(async (req) => {
     );
   }
 
+  const providerMessageId = info.messageId || `kidsflix-${event.id}@gmail.com`;
+  const providerResponse = {
+    messageId: providerMessageId,
+    response: sanitizeProviderMessage(String(info.response ?? '')).slice(0, 500),
+    acceptedCount: Array.isArray(info.accepted) ? info.accepted.length : null,
+    rejectedCount: Array.isArray(info.rejected) ? info.rejected.length : null,
+  };
   const recorded = await recordResult(supabase, {
     eventId: event.id,
     accepted: true,
     providerMessageId,
-    providerResponse: safeProviderResponse(response, providerBody),
+    providerResponse,
   });
 
-  console.log('[pin-security-alert] provider accepted', {
+  console.log('[pin-security-alert] Gmail accepted', {
     eventId: event.id,
     recipient: event.recipientMasked,
     providerMessageId,
@@ -472,12 +423,12 @@ Deno.serve(async (req) => {
     recipientMasked: event.recipientMasked,
     deliveryConfirmed: false,
     diagnosticsRecorded: recorded,
-    message: 'Resend accepted the email. Inbox delivery is not confirmed until a delivery event or inbox check.',
+    message: 'Gmail accepted the email. Inbox delivery is not tracked; check the inbox and Spam folder.',
   });
 });
 
 async function recordResult(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseClient<any, any, any>,
   args: {
     eventId: string;
     accepted: boolean;

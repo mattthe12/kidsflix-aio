@@ -78,7 +78,7 @@ controls and parent analytics. Everything from 1.x is still here.
   disabled in this build.
 
 ### Accounts, subscription
-- Parent sign-up / sign-in / sign-out, password recovery (Supabase email), persistent session.
+- Parent sign-up / sign-in / sign-out, password recovery (Gmail SMTP), persistent session.
 - Subscription screen with monthly/yearly plans, trial countdown, billing summary and
   **Stripe Checkout** hand-off. Kids cannot reach any purchase UI.
 - Demo mode stores accounts on-device with salted hashed passwords; configure Supabase for
@@ -231,31 +231,41 @@ sends it to the registered Supabase Auth email address.
    `parent_pin_security`, `pin_security_alert_events`, the lockout RPCs and the
    alert/test/diagnostic RPCs. There is deliberately no client-callable “clear
    lockout” RPC; only a correct PIN resets the counter.
-2. Create a [Resend](https://resend.com) API key and verify the sending domain.
-   The `from` address must belong to that verified domain. `onboarding@resend.dev`
-   is test-only and Resend will only deliver it to the Resend account owner.
-3. Set server-side secrets (never `EXPO_PUBLIC_*`):
+2. Use one Gmail account as the single sender. Turn on **2-Step Verification**,
+   then create an **App Password** at <https://myaccount.google.com/apppasswords>.
+   The normal Gmail password will not work for SMTP.
+3. In Supabase Dashboard → **Authentication → Emails → SMTP Settings**, enable
+   custom SMTP and enter:
+   - Host: `smtp.gmail.com`
+   - Port: `465`
+   - Username: the full Gmail address
+   - Password: the 16-character Gmail App Password
+   - Sender email: the same Gmail address
+   - Sender name: `KidsFlix.Aio Security`
+
+   This makes password-reset mail use the same single sender. No domain is needed.
+4. Set the Edge Function secrets (never `EXPO_PUBLIC_*`):
    ```
-   supabase secrets set RESEND_API_KEY=re_...
-   supabase secrets set SECURITY_ALERT_FROM="KidsFlix Security <security@your-verified-domain>"
-   supabase secrets set SECURITY_ALERT_REPLY_TO=support@your-domain   # optional
+   supabase secrets set SMTP_HOST=smtp.gmail.com
+   supabase secrets set SMTP_PORT=465
+   supabase secrets set SMTP_SECURE=true
+   supabase secrets set SMTP_USERNAME=your-account@gmail.com
+   supabase secrets set SMTP_PASSWORD="your 16-character app password"
+   supabase secrets set SECURITY_ALERT_FROM="KidsFlix.Aio Security <your-account@gmail.com>"
+   supabase secrets set SECURITY_ALERT_REPLY_TO=your-account@gmail.com   # optional
    supabase functions deploy pin-security-alert
    ```
-4. Optional but recommended for delivery status: create a Resend webhook for
-   `email.delivered`, `email.bounced`, `email.complained` and `email.failed` at
-   `https://<project-ref>.supabase.co/functions/v1/pin-security-webhook`, set
-   `RESEND_WEBHOOK_SECRET` to its `whsec_...` signing secret and deploy
-   `pin-security-webhook --no-verify-jwt`.
 5. In the protected Parent Dashboard → Account, press **SEND TEST SECURITY EMAIL**.
-   A success message means Resend accepted the message; the diagnostic list shows
-   accepted, delivered, failed or rate-limited status. Delivery is only marked
-   delivered when a Resend webhook says so.
+   A success message means Gmail accepted the message. Gmail SMTP does not provide
+   delivery receipts, so the diagnostic list shows accepted, failed or rate-limited;
+   check the inbox and Spam folder to confirm delivery.
 
-Each lockout creates a single event row. A failed provider request is stored as
-`failed` and retried with backoff on a later app boot; Resend receives the event id
-as its idempotency key so a retry cannot create a duplicate message. Recipient
+Each lockout creates a single event row. A failed SMTP send is stored as `failed`
+and retried with backoff on a later app boot. The event id is reused in the
+Message-ID so a retry is less likely to create a duplicate message. Recipient
 addresses are masked in diagnostics and logs. The email never contains the PIN,
-PIN hash, passwords, auth tokens or API keys.
+PIN hash, passwords, auth tokens or API keys. Supabase blocks Edge Function
+connections to SMTP ports 25 and 587; port 465 is used instead.
 
 ---
 
@@ -305,8 +315,8 @@ supabase/
   schema.sql                Tables, trigger, RLS, PIN lockout RPCs
   functions/stripe-checkout Stripe Checkout session creator
   functions/stripe-webhook  Subscription sync (signature verified)
-  functions/pin-security-alert Event-based Resend security email + diagnostics
-  functions/pin-security-webhook Verified Resend delivery events
+  functions/pin-security-alert Event-based Gmail security email + diagnostics
+  functions/pin-security-webhook Legacy Resend webhook (not used by Gmail SMTP)
   migrations/               Event-level alert delivery migration
 ```
 
@@ -327,9 +337,10 @@ Tests for the shared lockout rules: `npm run test:pin` (no network or database r
   Spring) and Internet Archive auto-captions are bundled. Clips without a published caption
   file show “no captions published” instead of fake dialogue. Auto-captions are labelled and
   may contain errors; classic ComiColor/NOAA clips currently have no published CC track.
-- **Email lockout alerts need Resend configuration.** The PIN lockout works without
-  Resend, but inbox delivery requires a verified sender domain plus the
-  `RESEND_API_KEY` and `SECURITY_ALERT_FROM` function secrets described above.
+- **Email lockout alerts need Gmail SMTP configuration.** The PIN lockout works without
+  email, but inbox delivery requires a Gmail account with 2-Step Verification, a Gmail App
+  Password, and the `SMTP_USERNAME`, `SMTP_PASSWORD` and `SECURITY_ALERT_FROM` function
+  secrets described above. Gmail SMTP does not provide delivery receipts.
 - **Stripe is not live.** Checkout only opens when configured; plan state changes are driven
   by the webhook, so nothing pretends a payment succeeded.
 - **Notifications** are a parent-controlled preference toggle, not a push-notification

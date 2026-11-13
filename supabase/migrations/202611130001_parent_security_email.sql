@@ -1,11 +1,11 @@
 -- =============================================================================
 -- Parent security alert delivery — event-level records and retries
 --
--- The old flow claimed a global 15-minute alert slot *before* calling Resend.
+-- The old flow claimed a global 15-minute alert slot *before* calling the email service.
 -- A failed provider request therefore suppressed retries and no delivery status
 -- was persisted. This migration makes the lockout event itself the idempotency
 -- key: one row per lockout, claimed only while it is safe to send, and marked
--- accepted only after Resend returns a message id.
+-- accepted only after the email service returns a message id.
 -- =============================================================================
 
 create extension if not exists "pgcrypto";
@@ -169,8 +169,8 @@ $$;
 
 -- Claim a specific lockout event (or the newest retryable event). The row is
 -- marked "sending", never "accepted". A failed provider call moves it back to
--- "failed" with a retry time; the same event id is reused as Resend's
--- idempotency key, so retries cannot create duplicate messages.
+-- "failed" with a retry time; the same event id is reused in the Message-ID so
+-- retries are less likely to create duplicate messages.
 drop function if exists public.claim_pin_security_alert();
 
 create or replace function public.claim_pin_security_alert(p_event_id uuid default null)
@@ -259,9 +259,10 @@ begin
 end;
 $$;
 
--- Persist the provider's result. "accepted" means Resend returned a message id;
--- it does not mean the recipient's mailbox accepted the message. Delivered,
--- bounced and complained are filled in by the Resend webhook when configured.
+-- Persist the provider's result. "accepted" means the email service returned a
+-- message id; it does not mean the recipient's mailbox accepted the message.
+-- Delivered, bounced and complained are only filled in by a provider webhook;
+-- Gmail SMTP does not provide one.
 create or replace function public.complete_pin_security_alert(
   p_event_id uuid,
   p_accepted boolean,
@@ -430,7 +431,7 @@ begin
 end;
 $$;
 
--- Resend's webhook reports actual delivery outcomes. Only service_role can call
+-- A provider webhook can report actual delivery outcomes. Only service_role can call
 -- this; recipient addresses and webhook bodies are never logged here.
 create or replace function public.update_pin_security_alert_delivery(
   p_provider_message_id text,

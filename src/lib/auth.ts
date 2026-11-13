@@ -1,6 +1,8 @@
 import * as Crypto from 'expo-crypto';
 import { Platform } from 'react-native';
 import { isSupabaseConfigured, supabase } from './supabase';
+import { resolveAdminEmail } from './admin';
+import { normalizeLoginIdentifier } from './authRules';
 import { keys, newId, storage } from './storage';
 
 export interface AuthUser {
@@ -15,6 +17,9 @@ export type AuthError =
   | 'no-account'
   | 'wrong-password'
   | 'duplicate'
+  | 'unconfirmed'
+  | 'rate-limit'
+  | 'network'
   | 'unknown';
 
 export interface AuthResult {
@@ -56,6 +61,22 @@ export async function hashPin(pin: string, accountId: string): Promise<string> {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+/**
+ * The URL Supabase should return the browser to after an email link. Build it
+ * from the current page's directory so links keep the GitHub Pages base path
+ * (for example /kidsflix-aio/) instead of falling back to the site root.
+ */
+function emailReturnUrl(): string | undefined {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
+  const { origin, pathname } = window.location;
+  const directory = /\.[^/]+$/.test(pathname)
+    ? pathname.replace(/[^/]*$/, '')
+    : pathname.endsWith('/')
+      ? pathname
+      : `${pathname}/`;
+  return `${origin}${directory}`;
+}
+
 function userFromSupabase(user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> }): AuthUser {
   return {
     id: user.id,
@@ -94,10 +115,14 @@ export const authApi = {
       return { user: { id: account.id, email: account.email, name: account.name } };
     }
 
+    const redirectTo = emailReturnUrl();
     const { data, error } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
-      options: { data: { parent_name: name.trim() || 'Grown-up' } },
+      options: {
+        data: { parent_name: name.trim() || 'Grown-up' },
+        ...(redirectTo ? { emailRedirectTo: redirectTo } : {}),
+      },
     });
     if (error) {
       return { error: error.message.toLowerCase().includes('already') ? 'duplicate' : 'unknown', message: error.message };
@@ -109,27 +134,47 @@ export const authApi = {
   },
 
   async signIn(email: string, password: string): Promise<AuthResult> {
-    const cleanEmail = email.trim().toLowerCase();
-    if (!EMAIL_RE.test(cleanEmail)) return { error: 'invalid-email' };
+    const identifier = normalizeLoginIdentifier(email);
+    if (!identifier) return { error: 'invalid-email' };
     if (!password) return { error: 'short-password' };
 
     if (!isSupabaseConfigured || !supabase) {
       const accounts = await readLocalAccounts();
-      const account = accounts.find((a) => a.email === cleanEmail);
+      const account = accounts.find((a) => a.email === identifier);
       if (!account) return { error: 'no-account' };
-      const hash = await hashPassword(cleanEmail, password);
+      const hash = await hashPassword(identifier, password);
       if (hash !== account.passwordHash) return { error: 'wrong-password' };
       return { user: { id: account.id, email: account.email, name: account.name } };
     }
 
-    const { data, error } = await supabase.auth.signInWithPassword({ email: cleanEmail, password });
+    // Email login stays unchanged. A bare username is resolved by a server-side
+    // RPC, then the normal Supabase password check is still performed.
+    let loginEmail = identifier;
+    if (!identifier.includes('@')) {
+      const resolved = await resolveAdminEmail(identifier);
+      if (!resolved) return { error: 'no-account' };
+      loginEmail = resolved;
+    } else if (!EMAIL_RE.test(identifier)) {
+      return { error: 'invalid-email' };
+    }
+
+    const { data, error } = await supabase.auth.signInWithPassword({ email: loginEmail, password });
     if (error) {
-      return { error: error.message.toLowerCase().includes('invalid') ? 'wrong-password' : 'unknown', message: error.message };
+      const message = error.message.toLowerCase();
+      if (message.includes('email not confirmed')) return { error: 'unconfirmed', message: error.message };
+      if (message.includes('rate limit')) return { error: 'rate-limit', message: error.message };
+      if (message.includes('invalid login') || message.includes('invalid credentials') || message.includes('invalid password')) {
+        return { error: 'wrong-password', message: error.message };
+      }
+      if (message.includes('fetch') || message.includes('network')) {
+        return { error: 'network', message: 'Could not reach the sign-in service. Check your connection and try again.' };
+      }
+      return { error: 'unknown', message: error.message };
     }
     const user = data.user;
     if (!user) return { error: 'unknown' };
     const name = (user.user_metadata?.parent_name as string | undefined) ?? 'Grown-up';
-    return { user: { id: user.id, email: user.email ?? cleanEmail, name } };
+    return { user: { id: user.id, email: user.email ?? loginEmail, name } };
   },
 
   async signOut(): Promise<void> {
@@ -145,10 +190,7 @@ export const authApi = {
     if (!isSupabaseConfigured || !supabase) {
       return { ok: false, message: 'Demo mode: password reset needs Supabase email delivery configured.' };
     }
-    const redirectTo =
-      Platform.OS === 'web' && typeof window !== 'undefined'
-        ? `${window.location.origin}${window.location.pathname}`
-        : undefined;
+    const redirectTo = emailReturnUrl();
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, redirectTo ? { redirectTo } : undefined);
     if (error) {
       if (error.message.toLowerCase().includes('rate limit')) {

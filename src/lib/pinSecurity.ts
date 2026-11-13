@@ -15,7 +15,7 @@ import { keys, storage } from './storage';
  * With Supabase configured, the database RPC is the source of truth: it
  * compares the candidate hash, enforces the lockout server-side, persists it
  * across devices/restarts and creates one alert event per lockout. The Edge
- * Function owns the email send and records Resend's real response. The device
+ * Function owns the email send and records Gmail's real response. The device
  * keeps a small mirror so a network hiccup or a reload cannot silently remove
  * an active countdown. Demo mode uses the same lockout rules locally.
  */
@@ -229,7 +229,7 @@ export const pinSecurity = {
   /**
    * Ask the server-side function to email the registered parent. The function
    * rechecks the lockout event, resolves the recipient from Supabase Auth and
-   * uses the event id as the provider idempotency key.
+   * uses the event id to prevent duplicate emails.
    */
   requestAlert(accountId: string, result: PinAttemptResult): Promise<PinAlertStatus> {
     if (!result.alertDue || !result.locked) return Promise.resolve('skipped');
@@ -268,7 +268,7 @@ export const pinSecurity = {
   /**
    * Retry the newest failed event after its backoff. Called once when a parent
    * session boots; the server decides whether any event is eligible, so this
-   * cannot create a second alert for an event Resend already accepted.
+   * cannot create a second alert for an event Gmail already accepted.
    */
   async retryPendingAlerts(): Promise<PinAlertStatus> {
     if (!backendAvailable()) return 'not_configured';
@@ -283,7 +283,7 @@ export const pinSecurity = {
     }
   },
 
-  /** Send a real test email. Success means Resend accepted it, not inbox delivery. */
+  /** Send a real test email. Success means Gmail accepted it, not inbox delivery. */
   async sendTestEmail(): Promise<TestEmailResult> {
     if (!backendAvailable()) {
       return {
@@ -302,7 +302,7 @@ export const pinSecurity = {
       return {
         ok: true,
         status: 'accepted',
-        message: typeof payload.message === 'string' ? payload.message : 'Resend accepted the test email.',
+        message: typeof payload.message === 'string' ? payload.message : 'Gmail accepted the test email.',
         recipientMasked: typeof payload.recipientMasked === 'string' ? payload.recipientMasked : undefined,
         eventId: typeof payload.eventId === 'string' ? payload.eventId : undefined,
         providerMessageId:

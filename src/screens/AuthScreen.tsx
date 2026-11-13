@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,11 +17,14 @@ import { BigButton } from '../components/BigButton';
 import { TextField } from '../components/TextField';
 import { colors, font, gradients, radius } from '../theme';
 import { useApp } from '../state/AppProvider';
+import { loginFormValid, signupPasswordError } from '../lib/authRules';
 
 type Mode = 'login' | 'signup' | 'recover';
 
 export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack: () => void }) {
   const { t, signIn, signUp, resetPassword, isDemo } = useApp();
+  const { width } = useWindowDimensions();
+  const compact = width < 370;
   const [mode, setMode] = useState<Mode>(initialMode);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -30,8 +34,20 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
   const [info, setInfo] = useState<string | null>(null);
 
   const submit = async () => {
+    if (busy) return;
     setError(null);
     setInfo(null);
+    if (!email.trim() || (mode !== 'recover' && !password)) {
+      setError('Enter your email or administrator username and your password.');
+      return;
+    }
+    if (mode === 'signup') {
+      const passwordError = signupPasswordError(password);
+      if (passwordError) {
+        setError(passwordError);
+        return;
+      }
+    }
     setBusy(true);
     try {
       if (mode === 'recover') {
@@ -50,12 +66,15 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
         const messages: Record<string, string> = {
           'invalid-email': t('badEmail'),
           'short-password': t('shortPassword'),
-          'wrong-password': 'That email and password do not match. Try again.',
-          'no-account': 'We could not find an account with that email.',
+          'wrong-password': 'That email or username and password do not match. Try again.',
+          'no-account': 'We could not find an account with that email or administrator username.',
           duplicate: 'That email already has a KidsFlix account. Try signing in.',
+          unconfirmed: 'Please confirm your email address first. Check your inbox, then try again.',
+          'rate-limit': 'Too many sign-in attempts. Wait a few minutes and try again.',
+          network: 'Could not reach the sign-in service. Check your mobile connection and try again.',
           unknown: 'Something went wrong. Please try again.',
         };
-        setError(messages[res.error] ?? messages.unknown);
+        setError(messages[res.error] ?? res.message ?? messages.unknown);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong.');
@@ -76,8 +95,17 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
         end={{ x: 1, y: 1 }}
       />
       <SafeAreaView style={styles.safe}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-          <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <ScrollView
+            contentContainerStyle={[styles.scroll, compact && styles.scrollCompact]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={false}
+            automaticallyAdjustKeyboardInsets
+          >
             <View style={styles.topRow}>
               <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Go back" hitSlop={10}>
                 <Text style={styles.back}>←</Text>
@@ -91,7 +119,7 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
               <Logo size={32} />
             </View>
 
-            <Text style={styles.title}>
+            <Text style={[styles.title, compact && styles.titleCompact]}>
               {isRecover ? 'Reset your password' : mode === 'signup' ? 'Create your family account' : 'Welcome back!'}
             </Text>
             <Text style={styles.subtitle}>
@@ -115,15 +143,17 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
                 />
               ) : null}
               <TextField
-                label={t('email')}
+                label={isRecover ? t('email') : 'Email or administrator username'}
                 icon="✉️"
                 value={email}
                 onChangeText={setEmail}
-                placeholder="grownup@example.com"
-                keyboardType="email-address"
+                placeholder={isRecover ? 'grownup@example.com' : 'grownup@example.com or admin'}
+                keyboardType={email.includes('@') || isRecover ? 'email-address' : 'default'}
                 autoCapitalize="none"
                 autoCorrect={false}
-                autoComplete="email"
+                autoComplete="username"
+                textContentType="username"
+                returnKeyType="next"
               />
               {!isRecover ? (
                 <TextField
@@ -135,6 +165,7 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
                   secure
                   autoCapitalize="none"
                   autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                  textContentType={mode === 'signup' ? 'newPassword' : 'password'}
                   onSubmitEditing={submit}
                   returnKeyType="go"
                 />
@@ -155,7 +186,7 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
                 label={isRecover ? 'Send reset link' : mode === 'signup' ? t('createAccount') : t('signIn')}
                 icon={busy ? undefined : mode === 'signup' ? '✨' : '🔑'}
                 onPress={submit}
-                disabled={busy || !email.trim() || (!isRecover && password.length < 6)}
+                disabled={busy || !loginFormValid(email, isRecover ? 'recovery' : password)}
                 size="lg"
               />
               {busy ? <ActivityIndicator color={colors.white} style={{ marginTop: 12 }} /> : null}
@@ -192,10 +223,11 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
+  root: { flex: 1, backgroundColor: colors.bg, overflow: 'hidden' },
   safe: { flex: 1 },
   topGlow: { position: 'absolute', top: -180, right: -120, width: 420, height: 420, borderRadius: 210 },
-  scroll: { paddingHorizontal: 24, paddingVertical: 18, flexGrow: 1, maxWidth: 560, width: '100%', alignSelf: 'center' },
+  scroll: { paddingHorizontal: 24, paddingVertical: 18, paddingBottom: 34, flexGrow: 1, maxWidth: 560, width: '100%', alignSelf: 'center' },
+  scrollCompact: { paddingHorizontal: 16, paddingTop: 12 },
   topRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 },
   back: { fontSize: 26, color: colors.white, fontFamily: font.bold },
   parentBadge: {
@@ -209,6 +241,7 @@ const styles = StyleSheet.create({
   parentBadgeText: { fontFamily: font.bold, fontSize: 12, color: colors.yellow },
   brandRow: { marginBottom: 22 },
   title: { fontFamily: font.display, fontSize: 34, color: colors.white, lineHeight: 40 },
+  titleCompact: { fontSize: 28, lineHeight: 34 },
   subtitle: { fontFamily: font.body, fontSize: 15, color: colors.textDim, lineHeight: 22, marginTop: 8, marginBottom: 24 },
   form: {
     backgroundColor: 'rgba(255,255,255,0.05)',
