@@ -1,0 +1,7 @@
+{
+  "siteId": "f97032b2-5ca6-48fd-8d15-1f75ed0eb630",
+  "name": "KidsFlix",
+  "manifest": "freebuff.deploy.json",
+  "build": "npx expo export --platform web",
+  "assets": "dist"
+}

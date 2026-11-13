@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "KidsFlix",
+    "slug": "kidsflix-aio",
+    "scheme": "kidsflixaio",
+    "version": "2.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#150C31",
+    "primaryColor": "#7C4DFF",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "world.kidsflixaio.app",
+      "infoPlist": {
+        "NSAppTransportSecurity": { "NSAllowsArbitraryLoads": false },
+        "UIBackgroundModes": ["audio"]
+      }
+    },
+    "android": {
+      "package": "world.kidsflixaio.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#150C31",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": ["android.permission.INTERNET"]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/favicon.png",
+      "name": "KidsFlix — safe streaming for kids",
+      "themeColor": "#150C31",
+      "backgroundColor": "#150C31"
+    },
+    "plugins": ["expo-video", "expo-font", "expo-splash-screen"],
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#150C31"
+    },
+    "extra": {
+      "kidSafety": {
+        "noAds": true,
+        "noChat": true,
+        "noPublicProfiles": true,
+        "parentPinRequired": true
+      }
+    }
+  }
+}
