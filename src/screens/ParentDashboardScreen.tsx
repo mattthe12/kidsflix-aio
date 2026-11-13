@@ -559,7 +559,7 @@ export function ParentDashboardScreen() {
               <Text style={styles.cardLabel}>ACCOUNT PASSWORD</Text>
               <Text style={styles.securityCopy}>
                 Change the password you use to sign in. Your current password is required, and KidsFlix never stores
-                or displays the new one.
+                or displays the new one. Changing it does not reset kid profiles, favorites, downloads or watch history.
               </Text>
               <BigButton
                 label="CHANGE PASSWORD"
@@ -654,9 +654,14 @@ export function ParentDashboardScreen() {
 
       <Sheet visible={passwordOpen} onClose={() => setPasswordOpen(false)} title="Change account password">
         <Text style={styles.sheetBody}>
-          Confirm your current password first, then choose a new one. This only changes the grown-up sign-in password;
-          kid profiles, watch history and the parent PIN stay the same.
+          Confirm your current password first, then choose a new one. This only changes the grown-up sign-in password.
         </Text>
+        <View style={styles.kidsUntouchedBox}>
+          <Text style={styles.kidsUntouchedTitle}>🧒 Kid accounts stay exactly as they are</Text>
+          <Text style={styles.kidsUntouchedText}>
+            No profiles, favorites, downloads, approvals or watch history will be deleted or reset.
+          </Text>
+        </View>
         <TextField
           label="Current password"
           icon="🔒"
@@ -818,6 +823,9 @@ const styles = StyleSheet.create({
   accountEmail: { fontFamily: font.bold, fontSize: 16, color: colors.white, marginBottom: 8 },
   passwordCard: { marginTop: 14, marginBottom: 8, gap: 10 },
   passwordSuccess: { fontFamily: font.medium, fontSize: 12, color: colors.mint, lineHeight: 17 },
+  kidsUntouchedBox: { backgroundColor: 'rgba(63,224,176,0.12)', borderRadius: radius.md, padding: 12, marginBottom: 14, gap: 3 },
+  kidsUntouchedTitle: { fontFamily: font.bold, fontSize: 13, color: colors.mint },
+  kidsUntouchedText: { fontFamily: font.body, fontSize: 12, color: colors.textDim, lineHeight: 17 },
   passwordErrorBox: { backgroundColor: 'rgba(255,94,108,0.16)', borderRadius: radius.sm, padding: 12, marginBottom: 8 },
   passwordError: { fontFamily: font.semibold, fontSize: 12.5, color: '#FFB3B9', lineHeight: 18 },
   securityCard: { marginTop: 14, marginBottom: 8, gap: 10 },

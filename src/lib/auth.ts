@@ -212,7 +212,7 @@ export const authApi = {
       if (currentHash !== account.passwordHash) return { ok: false, message: 'Your current password is not correct.' };
       const nextHash = await hashPassword(account.email, newPassword);
       await writeLocalAccounts(accounts.map((a) => (a.id === account.id ? { ...a, passwordHash: nextHash } : a)));
-      return { ok: true, message: 'Your password has been updated.' };
+      return { ok: true, message: 'Your password has been updated. Kid profiles and watch history were not changed.' };
     }
 
     // Verify the current password before changing it. This prevents someone
@@ -225,7 +225,7 @@ export const authApi = {
 
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) return { ok: false, message: error.message };
-    return { ok: true, message: 'Your password has been updated. Use it the next time you sign in.' };
+    return { ok: true, message: 'Your password has been updated. Kid profiles and watch history were not changed.' };
   },
 
   async restore(): Promise<AuthUser | null> {
