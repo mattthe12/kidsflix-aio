@@ -38,6 +38,7 @@ interface AppContextValue {
   profiles: Profile[];
   profile: Profile | null;
   isDemo: boolean;
+  recovery: boolean;
   t: (key: string) => string;
   parentUnlocked: boolean;
 
@@ -45,6 +46,7 @@ interface AppContextValue {
   signIn: (email: string, password: string) => Promise<{ error?: string; needsEmailConfirm?: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ ok: boolean; message: string }>;
+  finishPasswordReset: (password: string) => Promise<{ ok: boolean; message: string }>;
 
   selectProfile: (id: string) => void;
   addProfile: (input: { name: string; avatar: string; ageGroup: AgeGroup }) => Profile | null;
@@ -113,6 +115,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [account, setAccount] = useState<AuthUser | null>(null);
   const [family, setFamily] = useState<FamilyData | null>(null);
+  const [recovery, setRecovery] = useState(false);
   const [unlockedAt, setUnlockedAt] = useState(0);
   const [downloading, setDownloading] = useState(false);
   const progressThrottle = useRef<Record<string, number>>({});
@@ -122,7 +125,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let alive = true;
     (async () => {
       try {
-        const user = await authApi.restore();
+        // A recovery link signs the browser in just long enough to choose a
+        // new password. Do not auto-seed the app until that password is set.
+        const recoveryUser = await authApi.consumeRecoveryLink();
+        const user = recoveryUser ?? (await authApi.restore());
         if (!user) return;
         let fam = await loadFamily(user.id, user.email);
         const pulled = await remote.pull(user.id);
@@ -142,6 +148,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (!alive) return;
         setAccount(user);
         setFamily(fam);
+        setRecovery(Boolean(recoveryUser));
         // If a previous lockout alert failed (or the app closed before the
         // request finished), the server retries only an eligible event after
         // its backoff. Resend's idempotency key prevents duplicate emails.
@@ -185,6 +192,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const fam = await loadFamily(user.id, user.email);
     setAccount(user);
     setFamily(fam);
+    setRecovery(false);
     setUnlockedAt(0);
   }, []);
 
@@ -213,10 +221,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await authApi.signOut();
     setAccount(null);
     setFamily(null);
+    setRecovery(false);
     setUnlockedAt(0);
   }, []);
 
   const resetPassword = useCallback(async (email: string) => authApi.resetPassword(email), []);
+
+  const finishPasswordReset = useCallback(
+    async (password: string) => {
+      const result = await authApi.updatePassword(password);
+      if (result.ok) setRecovery(false);
+      return result;
+    },
+    []
+  );
 
   /* ── profiles ─────────────────────────────────────────────────────────── */
   const selectProfile = useCallback(
@@ -684,12 +702,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     profiles,
     profile,
     isDemo: !isSupabaseConfigured,
+    recovery,
     t,
     parentUnlocked,
     signUp,
     signIn,
     signOut,
     resetPassword,
+    finishPasswordReset,
     selectProfile,
     addProfile,
     updateProfile,

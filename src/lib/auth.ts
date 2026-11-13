@@ -1,4 +1,5 @@
 import * as Crypto from 'expo-crypto';
+import { Platform } from 'react-native';
 import { isSupabaseConfigured, supabase } from './supabase';
 import { keys, newId, storage } from './storage';
 
@@ -54,6 +55,14 @@ export async function hashPin(pin: string, accountId: string): Promise<string> {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function userFromSupabase(user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> }): AuthUser {
+  return {
+    id: user.id,
+    email: user.email ?? '',
+    name: (user.user_metadata?.parent_name as string | undefined) ?? 'Grown-up',
+  };
+}
 
 async function readLocalAccounts(): Promise<LocalAccount[]> {
   return (await storage.get<LocalAccount[]>(keys.localAccounts)) ?? [];
@@ -136,9 +145,48 @@ export const authApi = {
     if (!isSupabaseConfigured || !supabase) {
       return { ok: false, message: 'Demo mode: password reset needs Supabase email delivery configured.' };
     }
-    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail);
+    const redirectTo =
+      Platform.OS === 'web' && typeof window !== 'undefined'
+        ? `${window.location.origin}${window.location.pathname}`
+        : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, redirectTo ? { redirectTo } : undefined);
     if (error) return { ok: false, message: error.message };
     return { ok: true, message: `We sent a reset link to ${cleanEmail}.` };
+  },
+
+  /**
+   * Supabase returns recovery tokens in the URL fragment. We do not let the
+   * client auto-consume them because the app needs a chance to show the
+   * "set a new password" screen first. Read and remove the tokens here, then
+   * establish the short-lived recovery session explicitly.
+   */
+  async consumeRecoveryLink(): Promise<AuthUser | null> {
+    if (!isSupabaseConfigured || !supabase || Platform.OS !== 'web' || typeof window === 'undefined') return null;
+    const params = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    if (params.get('type') !== 'recovery') return null;
+    const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
+    if (!accessToken || !refreshToken) return null;
+
+    // Never leave recovery credentials in the address bar or browser history.
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    if (error || !data.user) return null;
+    return userFromSupabase(data.user);
+  },
+
+  async updatePassword(password: string): Promise<{ ok: boolean; message: string }> {
+    if (password.length < 6) return { ok: false, message: 'Password must be at least 6 characters.' };
+    if (!isSupabaseConfigured || !supabase) {
+      return { ok: false, message: 'Demo mode: password updates need Supabase configured.' };
+    }
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, message: 'Your password has been updated.' };
   },
 
   async restore(): Promise<AuthUser | null> {
@@ -146,11 +194,7 @@ export const authApi = {
       const { data } = await supabase.auth.getSession();
       const user = data.session?.user;
       if (!user) return null;
-      return {
-        id: user.id,
-        email: user.email ?? '',
-        name: (user.user_metadata?.parent_name as string | undefined) ?? 'Grown-up',
-      };
+      return userFromSupabase(user);
     }
     const saved = await storage.get<{ accountId: string; email: string; parentName: string }>(keys.session);
     if (!saved) return null;

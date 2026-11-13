@@ -19,6 +19,7 @@ import { colors, font, gradients } from './src/theme';
 
 import { WelcomeScreen } from './src/screens/WelcomeScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
+import { ResetPasswordScreen } from './src/screens/ResetPasswordScreen';
 import { PinSetupScreen } from './src/screens/PinSetupScreen';
 import { ProfilePickerScreen } from './src/screens/ProfilePickerScreen';
 import { ProfileFormScreen } from './src/screens/ProfileFormScreen';
@@ -70,7 +71,7 @@ function TabScreens() {
 }
 
 function Root() {
-  const { ready, account, settings, profiles, profile, parentUnlocked, lockParent } = useApp();
+  const { ready, recovery, account, settings, profiles, profile, parentUnlocked, lockParent } = useApp();
   const nav = useNav();
   const [authMode, setAuthMode] = useState<'login' | 'signup' | null>(null);
 
@@ -91,6 +92,7 @@ function Root() {
   }, [nav.canGoBack, nav.back]);
 
   if (!ready) return <Splash />;
+  if (recovery) return <ResetPasswordScreen />;
 
   if (!account) {
     if (!authMode) {
