@@ -5,6 +5,7 @@ import { Screen, PageHeader, SettingRow, Card } from '../components/Screen';
 import { Avatar } from '../components/Avatar';
 import { BigButton, Chip, IconSwitch } from '../components/BigButton';
 import { Sheet } from '../components/Sheet';
+import { TextField } from '../components/TextField';
 import { AGE_GROUPS } from '../data/avatars';
 import { CATEGORY_MAP, allTitles, titleById } from '../data/catalog';
 import { colors, font, radius } from '../theme';
@@ -41,6 +42,7 @@ export function ParentDashboardScreen() {
     signOut,
     setParentName,
     clearHistory,
+    changePassword,
   } = useApp();
   const nav = useNav();
   const [tab, setTab] = useState<Tab>('overview');
@@ -52,6 +54,13 @@ export function ParentDashboardScreen() {
   const [testEmailState, setTestEmailState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
   const [testEmailMessage, setTestEmailMessage] = useState('');
   const [alertDiagnostics, setAlertDiagnostics] = useState<SecurityAlertDiagnostic[]>([]);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordNotice, setPasswordNotice] = useState('');
 
   useEffect(() => {
     if (tab !== 'account' || isDemo) return;
@@ -63,6 +72,34 @@ export function ParentDashboardScreen() {
       alive = false;
     };
   }, [tab, isDemo]);
+
+  const submitPasswordChange = async () => {
+    setPasswordError('');
+    if (!currentPassword) {
+      setPasswordError('Enter your current password.');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('The new password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError('The new passwords do not match.');
+      return;
+    }
+    setPasswordBusy(true);
+    const result = await changePassword(currentPassword, newPassword);
+    setPasswordBusy(false);
+    if (!result.ok) {
+      setPasswordError(result.message);
+      return;
+    }
+    setPasswordOpen(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordNotice(result.message);
+  };
 
   const sendTestSecurityEmail = async () => {
     setTestEmailState('sending');
@@ -518,6 +555,25 @@ export function ParentDashboardScreen() {
               />
             </Card>
 
+            <Card style={styles.passwordCard}>
+              <Text style={styles.cardLabel}>ACCOUNT PASSWORD</Text>
+              <Text style={styles.securityCopy}>
+                Change the password you use to sign in. Your current password is required, and KidsFlix never stores
+                or displays the new one.
+              </Text>
+              <BigButton
+                label="CHANGE PASSWORD"
+                variant="soft"
+                icon="🔐"
+                size="sm"
+                onPress={() => {
+                  setPasswordError('');
+                  setPasswordOpen(true);
+                }}
+              />
+              {passwordNotice ? <Text style={styles.passwordSuccess}>{passwordNotice}</Text> : null}
+            </Card>
+
             <Card style={styles.securityCard}>
               <Text style={styles.cardLabel}>SECURITY EMAIL</Text>
               <Text style={styles.securityCopy}>
@@ -595,6 +651,67 @@ export function ParentDashboardScreen() {
           </View>
         </View>
       ) : null}
+
+      <Sheet visible={passwordOpen} onClose={() => setPasswordOpen(false)} title="Change account password">
+        <Text style={styles.sheetBody}>
+          Confirm your current password first, then choose a new one. This only changes the grown-up sign-in password;
+          kid profiles, watch history and the parent PIN stay the same.
+        </Text>
+        <TextField
+          label="Current password"
+          icon="🔒"
+          value={currentPassword}
+          onChangeText={(v) => {
+            setCurrentPassword(v);
+            setPasswordError('');
+          }}
+          secure
+          placeholder="Your current password"
+          autoCapitalize="none"
+          autoComplete="current-password"
+        />
+        <TextField
+          label="New password"
+          icon="🔐"
+          value={newPassword}
+          onChangeText={(v) => {
+            setNewPassword(v);
+            setPasswordError('');
+          }}
+          secure
+          placeholder="At least 6 characters"
+          autoCapitalize="none"
+          autoComplete="new-password"
+          helper={`${newPassword.length}/6 minimum`}
+        />
+        <TextField
+          label="Confirm new password"
+          icon="🔐"
+          value={confirmPassword}
+          onChangeText={(v) => {
+            setConfirmPassword(v);
+            setPasswordError('');
+          }}
+          secure
+          placeholder="Type the new password again"
+          autoCapitalize="none"
+          autoComplete="new-password"
+          onSubmitEditing={() => void submitPasswordChange()}
+        />
+        {passwordError ? (
+          <View style={styles.passwordErrorBox}>
+            <Text style={styles.passwordError}>{passwordError}</Text>
+          </View>
+        ) : null}
+        <BigButton
+          label={passwordBusy ? 'UPDATING PASSWORD…' : 'UPDATE PASSWORD'}
+          icon={passwordBusy ? undefined : '✨'}
+          onPress={() => void submitPasswordChange()}
+          disabled={passwordBusy || !currentPassword || newPassword.length < 6 || confirmPassword.length < 6}
+        />
+        <View style={{ height: 10 }} />
+        <BigButton label={t('cancel')} variant="ghost" onPress={() => setPasswordOpen(false)} disabled={passwordBusy} />
+      </Sheet>
 
       <Sheet visible={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} title="Delete this profile?">
         <Text style={styles.sheetBody}>
@@ -699,6 +816,10 @@ const styles = StyleSheet.create({
   historyName: { fontFamily: font.semibold, fontSize: 13.5, color: colors.white },
   historyMeta: { fontFamily: font.medium, fontSize: 10.5, color: colors.textFaint, marginTop: 2 },
   accountEmail: { fontFamily: font.bold, fontSize: 16, color: colors.white, marginBottom: 8 },
+  passwordCard: { marginTop: 14, marginBottom: 8, gap: 10 },
+  passwordSuccess: { fontFamily: font.medium, fontSize: 12, color: colors.mint, lineHeight: 17 },
+  passwordErrorBox: { backgroundColor: 'rgba(255,94,108,0.16)', borderRadius: radius.sm, padding: 12, marginBottom: 8 },
+  passwordError: { fontFamily: font.semibold, fontSize: 12.5, color: '#FFB3B9', lineHeight: 18 },
   securityCard: { marginTop: 14, marginBottom: 8, gap: 10 },
   securityCopy: { fontFamily: font.body, fontSize: 12.5, color: colors.textDim, lineHeight: 18 },
   securityHint: { fontFamily: font.body, fontSize: 11, color: colors.textFaint, lineHeight: 16 },

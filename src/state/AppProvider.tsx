@@ -47,6 +47,7 @@ interface AppContextValue {
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ ok: boolean; message: string }>;
   finishPasswordReset: (password: string) => Promise<{ ok: boolean; message: string }>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<{ ok: boolean; message: string }>;
 
   selectProfile: (id: string) => void;
   addProfile: (input: { name: string; avatar: string; ageGroup: AgeGroup }) => Profile | null;
@@ -234,6 +235,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return result;
     },
     []
+  );
+
+  const changePassword = useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      if (!account) return { ok: false, message: 'Sign in again before changing your password.' };
+      return authApi.changePassword(account.email, currentPassword, newPassword);
+    },
+    [account]
   );
 
   /* ── profiles ─────────────────────────────────────────────────────────── */
@@ -710,6 +719,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     signOut,
     resetPassword,
     finishPasswordReset,
+    changePassword,
     selectProfile,
     addProfile,
     updateProfile,

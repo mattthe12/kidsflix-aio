@@ -194,6 +194,40 @@ export const authApi = {
     return { ok: true, message: 'Your password has been updated.' };
   },
 
+  async changePassword(
+    email: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ ok: boolean; message: string }> {
+    if (newPassword.length < 6) return { ok: false, message: 'The new password must be at least 6 characters.' };
+    if (newPassword === currentPassword) {
+      return { ok: false, message: 'Choose a password that is different from your current one.' };
+    }
+
+    if (!isSupabaseConfigured || !supabase) {
+      const accounts = await readLocalAccounts();
+      const account = accounts.find((a) => a.email === email.trim().toLowerCase());
+      if (!account) return { ok: false, message: 'This account is only available on another device.' };
+      const currentHash = await hashPassword(account.email, currentPassword);
+      if (currentHash !== account.passwordHash) return { ok: false, message: 'Your current password is not correct.' };
+      const nextHash = await hashPassword(account.email, newPassword);
+      await writeLocalAccounts(accounts.map((a) => (a.id === account.id ? { ...a, passwordHash: nextHash } : a)));
+      return { ok: true, message: 'Your password has been updated.' };
+    }
+
+    // Verify the current password before changing it. This prevents someone
+    // with a borrowed signed-in browser from silently taking over the account.
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password: currentPassword,
+    });
+    if (verifyError) return { ok: false, message: 'Your current password is not correct.' };
+
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) return { ok: false, message: error.message };
+    return { ok: true, message: 'Your password has been updated. Use it the next time you sign in.' };
+  },
+
   async restore(): Promise<AuthUser | null> {
     if (isSupabaseConfigured && supabase) {
       const { data } = await supabase.auth.getSession();
