@@ -150,7 +150,12 @@ export const authApi = {
         ? `${window.location.origin}${window.location.pathname}`
         : undefined;
     const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, redirectTo ? { redirectTo } : undefined);
-    if (error) return { ok: false, message: error.message };
+    if (error) {
+      if (error.message.toLowerCase().includes('rate limit')) {
+        return { ok: false, message: 'Too many reset emails were requested. Please wait a few minutes and try again.' };
+      }
+      return { ok: false, message: error.message };
+    }
     return { ok: true, message: `We sent a reset link to ${cleanEmail}.` };
   },
 
