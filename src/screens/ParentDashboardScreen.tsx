@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Screen, PageHeader, SettingRow, Card } from '../components/Screen';
 import { Avatar } from '../components/Avatar';
@@ -11,6 +11,7 @@ import { colors, font, radius } from '../theme';
 import { useApp } from '../state/AppProvider';
 import { useNav } from '../nav';
 import { formatMinutes, timeAgo, todayKey } from '../lib/format';
+import { pinSecurity, type SecurityAlertDiagnostic } from '../lib/pinSecurity';
 import type { ApprovalStatus, Rating } from '../types';
 
 type Tab = 'overview' | 'kids' | 'controls' | 'history' | 'account';
@@ -48,6 +49,37 @@ export function ParentDashboardScreen() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [confirmClearHistory, setConfirmClearHistory] = useState(false);
   const [parentName, setLocalParentName] = useState(family?.parentName ?? '');
+  const [testEmailState, setTestEmailState] = useState<'idle' | 'sending' | 'success' | 'error'>('idle');
+  const [testEmailMessage, setTestEmailMessage] = useState('');
+  const [alertDiagnostics, setAlertDiagnostics] = useState<SecurityAlertDiagnostic[]>([]);
+
+  useEffect(() => {
+    if (tab !== 'account' || isDemo) return;
+    let alive = true;
+    void pinSecurity.diagnostics().then((alerts) => {
+      if (alive) setAlertDiagnostics(alerts);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [tab, isDemo]);
+
+  const sendTestSecurityEmail = async () => {
+    setTestEmailState('sending');
+    setTestEmailMessage('');
+    const result = await pinSecurity.sendTestEmail();
+    if (result.ok) {
+      setTestEmailState('success');
+      setTestEmailMessage(
+        `Resend accepted the test email for ${result.recipientMasked ?? account?.email ?? 'the registered parent'}. Check the inbox and Spam folder. Delivery is marked delivered only when Resend reports it.`
+      );
+    } else {
+      setTestEmailState('error');
+      setTestEmailMessage(result.error ?? 'The security email could not be sent.');
+    }
+    const alerts = await pinSecurity.diagnostics();
+    setAlertDiagnostics(alerts);
+  };
 
   const kid = profiles.find((p) => p.id === kidId) ?? profiles[0];
   const today = todayKey();
@@ -486,6 +518,60 @@ export function ParentDashboardScreen() {
               />
             </Card>
 
+            <Card style={styles.securityCard}>
+              <Text style={styles.cardLabel}>SECURITY EMAIL</Text>
+              <Text style={styles.securityCopy}>
+                Real PIN-lockout alerts go to the registered parent email from your Supabase account
+                {account?.email ? ` (${account.email})` : ''}. The PIN and its hash are never included.
+              </Text>
+              <BigButton
+                label={testEmailState === 'sending' ? 'SENDING TEST EMAIL…' : 'SEND TEST SECURITY EMAIL'}
+                variant="soft"
+                icon="✉️"
+                size="sm"
+                disabled={testEmailState === 'sending' || isDemo}
+                onPress={() => void sendTestSecurityEmail()}
+              />
+              {testEmailState === 'sending' ? (
+                <View style={styles.securityLoading}>
+                  <ActivityIndicator size="small" color={colors.white} />
+                  <Text style={styles.securityMeta}>Contacting Resend…</Text>
+                </View>
+              ) : null}
+              {testEmailState !== 'idle' && testEmailState !== 'sending' && testEmailMessage ? (
+                <Text style={[styles.securityMessage, testEmailState === 'error' ? styles.securityError : styles.securitySuccess]}>
+                  {testEmailMessage}
+                </Text>
+              ) : null}
+              <Text style={styles.securityHint}>
+                Test emails are separate from real lockout alerts. They create their own diagnostic entry and never
+                change the PIN lockout counter.
+              </Text>
+
+              {alertDiagnostics.length ? (
+                <View style={styles.diagnostics}>
+                  <Text style={styles.cardLabel}>RECENT SECURITY EMAIL ACTIVITY</Text>
+                  {alertDiagnostics.map((alert) => (
+                    <View key={alert.id} style={styles.diagnosticRow}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.diagnosticTitle}>
+                          {alert.kind === 'test' ? 'Test email' : `${alert.failedAttempts} failed PIN attempts`} · {alert.status}
+                        </Text>
+                        <Text style={styles.diagnosticMeta} numberOfLines={2}>
+                          {new Date(alert.eventAt).toLocaleString()} · {alert.recipientMasked || 'registered parent email'}
+                          {alert.attemptCount > 1 ? ` · attempt ${alert.attemptCount}` : ''}
+                          {alert.deliveredAt ? ' · delivered' : alert.status === 'accepted' ? ' · accepted by Resend' : ''}
+                        </Text>
+                        {alert.errorMessage ? (
+                          <Text style={styles.diagnosticError} numberOfLines={2}>{alert.errorMessage}</Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </Card>
+
             <SettingRow icon="💳" label={t('subscription')} subtitle={planLabel} onPress={() => nav.push({ name: 'subscription' })} />
             <SettingRow icon="🔑" label={t('changePin')} subtitle="Reset the 4-digit parent PIN" onPress={() => nav.push({ name: 'parentSetup' })} />
             <SettingRow icon="⚙️" label="Account settings" subtitle="Language, accessibility, legal" onPress={() => nav.push({ name: 'settings' })} />
@@ -613,6 +699,19 @@ const styles = StyleSheet.create({
   historyName: { fontFamily: font.semibold, fontSize: 13.5, color: colors.white },
   historyMeta: { fontFamily: font.medium, fontSize: 10.5, color: colors.textFaint, marginTop: 2 },
   accountEmail: { fontFamily: font.bold, fontSize: 16, color: colors.white, marginBottom: 8 },
+  securityCard: { marginTop: 14, marginBottom: 8, gap: 10 },
+  securityCopy: { fontFamily: font.body, fontSize: 12.5, color: colors.textDim, lineHeight: 18 },
+  securityHint: { fontFamily: font.body, fontSize: 11, color: colors.textFaint, lineHeight: 16 },
+  securityLoading: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  securityMeta: { fontFamily: font.medium, fontSize: 12, color: colors.textDim },
+  securityMessage: { fontFamily: font.medium, fontSize: 12, lineHeight: 17 },
+  securitySuccess: { color: colors.mint },
+  securityError: { color: '#FF9AA4' },
+  diagnostics: { marginTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.08)', paddingTop: 12, gap: 2 },
+  diagnosticRow: { flexDirection: 'row', gap: 8, paddingVertical: 7, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.06)' },
+  diagnosticTitle: { fontFamily: font.semibold, fontSize: 12.5, color: colors.white },
+  diagnosticMeta: { fontFamily: font.medium, fontSize: 10.5, color: colors.textFaint, marginTop: 2, lineHeight: 15 },
+  diagnosticError: { fontFamily: font.body, fontSize: 10.5, color: '#FF9AA4', marginTop: 2, lineHeight: 15 },
   legalCard: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.md, padding: 16, marginVertical: 12, gap: 10 },
   legalTitle: { fontFamily: font.bold, fontSize: 14, color: colors.white },
   legalText: { fontFamily: font.body, fontSize: 12, color: colors.textDim, lineHeight: 18 },

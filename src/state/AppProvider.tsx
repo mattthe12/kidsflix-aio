@@ -142,6 +142,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (!alive) return;
         setAccount(user);
         setFamily(fam);
+        // If a previous lockout alert failed (or the app closed before the
+        // request finished), the server retries only an eligible event after
+        // its backoff. Resend's idempotency key prevents duplicate emails.
+        void pinSecurity.retryPendingAlerts();
       } catch (err) {
         console.warn('[kidflix] boot failed', err);
       } finally {
@@ -316,7 +320,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       // A failed attempt revokes any existing grown-up session as well as
       // showing the countdown, so a lockout cannot be skipped by navigating
-      // back to an already-open parent screen.
+      // back to an already-open parent screen. The backend creates one alert
+      // event per lockout; the function sends it and records the real result.
       setUnlockedAt(0);
       if (result.alertDue) {
         void pinSecurity.requestAlert(family.accountId, result);

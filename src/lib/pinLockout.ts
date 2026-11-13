@@ -37,6 +37,8 @@ export interface PinAttemptResult extends PinSecurityState {
   locked: boolean;
   /** True when a new lockout began and the backend should send one alert. */
   alertDue: boolean;
+  /** Server-created event id used for one idempotent alert. */
+  alertEventId?: string | null;
 }
 
 export function lockoutSecondsForAttempts(attempts: number): number {
@@ -85,7 +87,7 @@ export function applyPinAttempt(
   // While a lockout is active, even the correct PIN is refused. This is what
   // stops a caller from skipping the wait by replaying the correct value.
   if (state.remainingSeconds > 0) {
-    return { ...state, ok: false, locked: true, alertDue: false };
+    return { ...state, ok: false, locked: true, alertDue: false, alertEventId: null };
   }
 
   if (matched) {
@@ -98,6 +100,7 @@ export function applyPinAttempt(
       ok: true,
       locked: false,
       alertDue: false,
+      alertEventId: null,
     };
   }
 
@@ -113,10 +116,11 @@ export function applyPinAttempt(
     ok: false,
     locked: lockoutSeconds > 0,
     alertDue: lockoutSeconds > 0,
+    alertEventId: null,
   };
 }
 
 export function emptyPinAttemptResult(now = Date.now()): PinAttemptResult {
   const state = makePinSecurityState(null, now);
-  return { ...state, ok: false, locked: false, alertDue: false };
+  return { ...state, ok: false, locked: false, alertDue: false, alertEventId: null };
 }

@@ -54,3 +54,4 @@ qa-*.png
 
 # local Supabase notes/secrets
 supabase/Cusstom/
+supabase/.temp/

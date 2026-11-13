@@ -68,14 +68,14 @@ controls and parent analytics. Everything from 1.x is still here.
 - **Kids**: create, edit, delete profiles with confirmation, set max content level.
 - **Controls**: per-kid approve/block for every title, remove favorites, download permission.
 - **History**: per-kid watch log with episode, minutes watched and time; clear history.
-- **Account**: display name, email, plan, PIN change, account settings, privacy summary,
-  sign out.
+- **Account**: display name, email, real security-email test with delivery diagnostics, plan,
+  PIN change, account settings, privacy summary, sign out.
 - PIN is salted + SHA-256 hashed. Forgotten PIN can only be reset with the **parent
   account password**, then a new PIN is set. Three wrong PINs lock every parent-PIN
   path for 5 seconds; each additional three wrong attempts doubles the wait (10, 20,
   40, 80 seconds…). The countdown and failure state survive screen changes and app
-  restarts. A successful PIN clears the counter. See **Parent PIN lockout alerts**
-  below for the rate-limited email notification.
+  restarts. A successful PIN clears the counter. Email alerts are intentionally
+  disabled in this build.
 
 ### Accounts, subscription
 - Parent sign-up / sign-in / sign-out, password recovery (Supabase email), persistent session.
@@ -219,34 +219,43 @@ Without this configuration the subscription screen explains exactly what is miss
 App Store / Play Store builds should use native in-app purchase instead of Stripe Checkout,
 per store policy — that needs its own product IDs and receipt validation.
 
-### 4. Parent PIN lockout alerts (Resend)
+### 4. Parent PIN lockout and security email
 
 Parent-PIN lockouts work locally in demo mode and are backed by Supabase when a
 project is configured. The database, not the browser, owns the counter and the
 lockout deadline; the client keeps a mirror so a reload cannot remove the
-countdown. The alert recipient is taken from the authenticated account, never
-from a request body.
+countdown. The backend creates one alert event per lockout, and the Edge Function
+sends it to the registered Supabase Auth email address.
 
-1. Re-run `supabase/schema.sql` in the SQL editor. This adds
-   `parent_pin_security` plus the `record_pin_attempt`, `pin_security_status`
-   and `claim_pin_security_alert` RPCs. There is deliberately no client-callable
-   “clear lockout” RPC; only a correct PIN resets the counter.
+1. Run `supabase/schema.sql` (or the migration in `supabase/migrations/`) to add
+   `parent_pin_security`, `pin_security_alert_events`, the lockout RPCs and the
+   alert/test/diagnostic RPCs. There is deliberately no client-callable “clear
+   lockout” RPC; only a correct PIN resets the counter.
 2. Create a [Resend](https://resend.com) API key and verify the sending domain.
-3. Set the server-side secrets and deploy the function:
+   The `from` address must belong to that verified domain. `onboarding@resend.dev`
+   is test-only and Resend will only deliver it to the Resend account owner.
+3. Set server-side secrets (never `EXPO_PUBLIC_*`):
    ```
    supabase secrets set RESEND_API_KEY=re_...
    supabase secrets set SECURITY_ALERT_FROM="KidsFlix Security <security@your-verified-domain>"
+   supabase secrets set SECURITY_ALERT_REPLY_TO=support@your-domain   # optional
    supabase functions deploy pin-security-alert
    ```
-4. Confirm the Edge Function is available to the app. No email key belongs in
-   `EXPO_PUBLIC_*` variables or the browser bundle.
+4. Optional but recommended for delivery status: create a Resend webhook for
+   `email.delivered`, `email.bounced`, `email.complained` and `email.failed` at
+   `https://<project-ref>.supabase.co/functions/v1/pin-security-webhook`, set
+   `RESEND_WEBHOOK_SECRET` to its `whsec_...` signing secret and deploy
+   `pin-security-webhook --no-verify-jwt`.
+5. In the protected Parent Dashboard → Account, press **SEND TEST SECURITY EMAIL**.
+   A success message means Resend accepted the message; the diagnostic list shows
+   accepted, delivered, failed or rate-limited status. Delivery is only marked
+   delivered when a Resend webhook says so.
 
-Each third failed attempt produces at most one alert every 15 minutes. The email
-contains the time, failed-attempt count, lockout duration and recovery guidance;
-it never contains the PIN or its hash. Resend also receives a per-lockout
-idempotency key so retries cannot duplicate the message. If the function or key
-is missing, the lockout still works locally and the app does not claim an email
-was delivered.
+Each lockout creates a single event row. A failed provider request is stored as
+`failed` and retried with backoff on a later app boot; Resend receives the event id
+as its idempotency key so a retry cannot create a duplicate message. Recipient
+addresses are masked in diagnostics and logs. The email never contains the PIN,
+PIN hash, passwords, auth tokens or API keys.
 
 ---
 
@@ -257,8 +266,8 @@ was delivered.
 - Kids never create accounts, enter email addresses or see billing UI.
 - Age ratings enforced per profile; parents can also block individual titles.
 - Parent area is PIN-gated with escalating lockouts, a persistent countdown,
-  password-based recovery (paused during an active lockout) and rate-limited
-  security-alert emails to the registered parent address.
+  password-based recovery (paused during an active lockout) and event-based security
+  email alerts to the registered parent address.
 - Downloads require a parent permission.
 - Privacy text in the dashboard describes what is stored (first name, avatar, age band,
   progress, history) and that history is parent-only and deletable.
@@ -296,7 +305,9 @@ supabase/
   schema.sql                Tables, trigger, RLS, PIN lockout RPCs
   functions/stripe-checkout Stripe Checkout session creator
   functions/stripe-webhook  Subscription sync (signature verified)
-  functions/pin-security-alert Rate-limited parent lockout email (Resend)
+  functions/pin-security-alert Event-based Resend security email + diagnostics
+  functions/pin-security-webhook Verified Resend delivery events
+  migrations/               Event-level alert delivery migration
 ```
 
 Tests for the shared lockout rules: `npm run test:pin` (no network or database required).
@@ -316,10 +327,9 @@ Tests for the shared lockout rules: `npm run test:pin` (no network or database r
   Spring) and Internet Archive auto-captions are bundled. Clips without a published caption
   file show “no captions published” instead of fake dialogue. Auto-captions are labelled and
   may contain errors; classic ComiColor/NOAA clips currently have no published CC track.
-- **Supabase paths are implemented but untested against a live project** in this build —
-  there were no project credentials. Demo (local) mode is what runs out of the box.
-  The PIN lockout works there; email alerts require the updated schema, the deployed
-  `pin-security-alert` function and Resend secrets described above.
+- **Email lockout alerts need Resend configuration.** The PIN lockout works without
+  Resend, but inbox delivery requires a verified sender domain plus the
+  `RESEND_API_KEY` and `SECURITY_ALERT_FROM` function secrets described above.
 - **Stripe is not live.** Checkout only opens when configured; plan state changes are driven
   by the webhook, so nothing pretends a payment succeeded.
 - **Notifications** are a parent-controlled preference toggle, not a push-notification
