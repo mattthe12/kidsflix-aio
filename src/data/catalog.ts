@@ -167,11 +167,11 @@ const SEEDS: Seed[] = [
   { id: 'wing-it', name: 'Wing It!', category: 'cartoons', sub: 'originals', rating: 'PG', emoji: '🐦', minutes: 4, year: 2023, popularity: 89, added: 3,
     description: 'A determined bird tries to fly in this slapstick Blender short.', tags: ['animals', 'silly', 'adventure'] },
   { id: 'hero', name: 'Hero', category: 'cartoons', sub: 'originals', rating: 'G', emoji: '⚙️', minutes: 4, year: 2018, popularity: 97, added: 0,
-    description: 'A bold 2D steampunk adventure drawn entirely with Blender\'s Grease Pencil tools.', tags: ['animation', 'adventure', 'fun'] },
+    description: 'A bold, dialogue-free 2D steampunk adventure drawn entirely with Blender\'s Grease Pencil tools.', tags: ['animation', 'adventure', 'fun'] },
   { id: 'coffee-run', name: 'Coffee Run', category: 'cartoons', sub: 'originals', rating: 'PG', emoji: '☕', minutes: 3, year: 2020, popularity: 95, added: 1,
-    description: 'A fast, funny, caffeine-powered dash through the city and its memories.', tags: ['animation', 'comedy', 'fun'] },
-  { id: 'glass-half', name: 'Glass Half', category: 'cartoons', sub: 'originals', rating: 'G', emoji: '🖼️', minutes: 3, year: 2015, popularity: 91, added: 2,
-    description: 'Two art critics argue over every painting in the gallery until they finally agree on one thing.', tags: ['animation', 'comedy', 'silly'] },
+    description: 'A fast, funny, dialogue-free caffeine-powered dash through the city and its memories.', tags: ['animation', 'comedy', 'fun'] },
+  { id: 'agent-327', name: 'Agent 327: Operation Barbershop', category: 'cartoons', sub: 'originals', rating: 'PG', emoji: '🕵️', minutes: 4, year: 2017, popularity: 93, added: 2,
+    description: 'A secret agent walks into a barbershop and into a very big fight in this English-language spy cartoon.', tags: ['animation', 'comedy', 'spy'] },
 
   // ── Learning Zone ──────────────────────────────────────────────────────────
   { id: 'abc-adventure', name: 'ABC Adventure', category: 'learning', sub: 'alphabet', rating: 'G', emoji: '🔤', minutes: 8, year: 2026, popularity: 94, added: 5,

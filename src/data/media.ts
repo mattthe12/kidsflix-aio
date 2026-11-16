@@ -14,7 +14,7 @@ import type { SubcategoryId } from '../types';
  * carries a credit line into the player and README.md lists the full sources.
  * Replace this file with your licensed catalogue for production.
  */
-export type MediaLicense = 'CC BY 3.0' | 'CC BY 4.0' | 'Public domain';
+export type MediaLicense = 'CC BY 3.0' | 'CC BY 4.0' | 'CC BY-ND 4.0' | 'Public domain';
 
 export interface MediaClip {
   id: string;
@@ -354,17 +354,17 @@ export const MEDIA_CLIPS: Record<string, MediaClip> = {
     sizeMb: 16.7,
     year: 2020,
   },
-  'glass-half': {
-    id: 'glass-half',
-    name: 'Glass Half',
+  'agent-327': {
+    id: 'agent-327',
+    name: 'Agent 327: Operation Barbershop',
     creator: 'Blender Studio',
-    license: 'CC BY 3.0',
-    licenseUrl: 'https://creativecommons.org/licenses/by/3.0/',
-    sourceUrl: 'https://archive.org/details/GlassHalf1080p',
-    streamUrl: 'https://archive.org/download/GlassHalf1080p/Glass%20Half-1080p.mp4',
-    durationSec: 193,
-    sizeMb: 62.7,
-    year: 2015,
+    license: 'CC BY-ND 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-nd/4.0/',
+    sourceUrl: 'https://archive.org/details/agent327operationbarbershop',
+    streamUrl: 'https://archive.org/download/agent327operationbarbershop/agent327.mp4',
+    durationSec: 231,
+    sizeMb: 22.4,
+    year: 2017,
   },
 };
 
