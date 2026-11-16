@@ -17,14 +17,30 @@ import { Logo } from '../components/Logo';
 import { EmojiPicker } from '../components/EmojiPicker';
 import { Sheet } from '../components/Sheet';
 import { AVATARS, AGE_GROUPS, avatarFor } from '../data/avatars';
-import { maxRatingForAge } from '../data/catalog';
+import { maxRatingForAge, visibleTitles } from '../data/catalog';
 import { colors, font, radius } from '../theme';
 import { useApp } from '../state/AppProvider';
 import { useNav } from '../nav';
-import type { AgeGroup } from '../types';
+import type { AgeGroup, CategoryId } from '../types';
 import { tap } from '../lib/haptics';
 
 const NAME_LIMIT = 24;
+
+const AGE_SUGGESTIONS: Record<AgeGroup, { blurb: string; categories: readonly CategoryId[] }> = {
+  toddler: { blurb: 'gentle songs, animal friends and first words', categories: ['learning', 'music', 'bedtime'] },
+  kid: { blurb: 'funny cartoons, science and superhero adventures', categories: ['cartoons', 'learning', 'movies'] },
+  tween: { blurb: 'movie classics, music and bigger adventures', categories: ['movies', 'music', 'cartoons'] },
+};
+
+function suggestionsForAge(ageGroup: AgeGroup) {
+  const available = visibleTitles(maxRatingForAge(ageGroup));
+  return AGE_SUGGESTIONS[ageGroup].categories.flatMap((category) =>
+    available
+      .filter((title) => title.category === category)
+      .sort((a, b) => b.popularity - a.popularity)
+      .slice(0, 1)
+  );
+}
 
 export function ProfileFormScreen({
   profileId,
@@ -48,6 +64,8 @@ export function ProfileFormScreen({
 
   const compact = width < 380;
   const selected = useMemo(() => avatarFor(avatar), [avatar]);
+  const ageInfo = AGE_GROUPS.find((group) => group.id === ageGroup) ?? AGE_GROUPS[1];
+  const agePicks = useMemo(() => suggestionsForAge(ageGroup), [ageGroup]);
   const finish = () => {
     if (onDone) onDone();
     else nav.back();
@@ -109,7 +127,7 @@ export function ProfileFormScreen({
                   </Text>
                   <Text style={[styles.subtitle, compact && { textAlign: 'center' }]}>
                     {standalone
-                      ? 'Create the first profile so KidsFlix knows what to recommend.'
+                      ? 'Create the first profile so SproutScreen knows what to recommend.'
                       : 'Each kid gets their own favourites, history and age level.'}
                   </Text>
                 </View>
@@ -162,6 +180,21 @@ export function ProfileFormScreen({
                     </Pressable>
                   );
                 })}
+              </View>
+
+              <View style={styles.ageLikes} accessibilityLiveRegion="polite">
+                <Text style={styles.ageLikesTitle}>
+                  {ageInfo.emoji} Ages {ageInfo.ages} usually love {AGE_SUGGESTIONS[ageGroup].blurb}.
+                </Text>
+                <View style={styles.ageLikePicks}>
+                  {agePicks.map((title) => (
+                    <View key={title.id} style={styles.ageLikeChip}>
+                      <Text style={styles.ageLikeChipText} numberOfLines={1}>
+                        {title.emoji} {title.name}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
 
               {error ? (
@@ -263,6 +296,18 @@ const styles = StyleSheet.create({
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.textFaint, alignItems: 'center', justifyContent: 'center' },
   radioOn: { borderColor: colors.white },
   radioDot: { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.white },
+  ageLikes: {
+    gap: 8,
+    padding: 12,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(63,224,176,0.07)',
+    borderWidth: 1,
+    borderColor: 'rgba(63,224,176,0.22)',
+  },
+  ageLikesTitle: { fontFamily: font.medium, fontSize: 12.5, color: colors.textDim, lineHeight: 18 },
+  ageLikePicks: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  ageLikeChip: { maxWidth: '100%', paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill, backgroundColor: 'rgba(63,224,176,0.14)' },
+  ageLikeChipText: { fontFamily: font.semibold, fontSize: 11.5, color: colors.mint },
   errorBox: { backgroundColor: 'rgba(255,94,108,0.16)', borderRadius: radius.sm, padding: 12 },
   errorText: { fontFamily: font.semibold, fontSize: 13, color: '#FFB3B9', textAlign: 'center' },
   hint: { fontFamily: font.body, fontSize: 12, color: colors.textFaint, textAlign: 'center', lineHeight: 17, marginTop: 2, paddingHorizontal: 8 },

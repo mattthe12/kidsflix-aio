@@ -28,7 +28,7 @@ export function SubscriptionScreen() {
 
   return (
     <Screen>
-      <PageHeader title="KidsFlix Family" subtitle="One plan, every kid profile" onBack={() => nav.back()} />
+      <PageHeader title="SproutScreen Family" subtitle="One plan, every kid profile" onBack={() => nav.back()} />
 
       <View style={styles.hero}>
         <LinearGradient colors={['#7C4DFF', '#FF5CA8']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
@@ -115,7 +115,7 @@ export function SubscriptionScreen() {
           <Text key={step} style={styles.sheetStep}>{i + 1}. {step}</Text>
         ))}
         <Text style={styles.sheetBody}>
-          Until then KidsFlix stays in its free trial and never pretends a payment succeeded. Children cannot purchase anything
+          Until then SproutScreen stays in its free trial and never pretends a payment succeeded. Children cannot purchase anything
           from the kid area.
         </Text>
         <BigButton label="Got it" onPress={() => setNotice(false)} />

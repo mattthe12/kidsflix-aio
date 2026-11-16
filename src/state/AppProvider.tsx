@@ -21,6 +21,7 @@ import {
 import { pinSecurity } from '../lib/pinSecurity';
 import { emptyPinAttemptResult, type PinAttemptResult } from '../lib/pinLockout';
 import { remote } from '../lib/remote';
+import { hydrateCatalog } from '../lib/content';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { defaultFamily, hydrateFamily, loadFamily, saveFamily, newId, storage, keys } from '../lib/storage';
 import { downloadKey, downloadVideo, offlineUri, removeOffline } from '../lib/downloads';
@@ -134,11 +135,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     let alive = true;
     (async () => {
       try {
+        // The catalogue is public and loads even on the welcome screen. Start
+        // it alongside auth so a slow auth request does not serialise boot.
+        const catalogPromise = hydrateCatalog();
         // A recovery link signs the browser in just long enough to choose a
         // new password. Do not auto-seed the app until that password is set.
         const recoveryUser = await authApi.consumeRecoveryLink();
         const user = recoveryUser ?? (await authApi.restore());
-        if (!user) return;
+        if (!user) {
+          await catalogPromise;
+          return;
+        }
         const adminSession = await loadAdminSession(user.id);
         let fam = await loadFamily(user.id, user.email);
         const pulled = await remote.pull(user.id);
@@ -155,6 +162,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             approvals: Object.keys(pulled.approvals ?? {}).length ? { ...fam.approvals, ...pulled.approvals } : fam.approvals,
           };
         }
+        await catalogPromise;
         if (!alive) return;
         setAccount(user);
         setFamily(fam);
@@ -165,7 +173,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // its backoff. The event id prevents duplicate emails.
         void pinSecurity.retryPendingAlerts();
       } catch (err) {
-        console.warn('[kidflix] boot failed', err);
+        console.warn('[sproutscreen] boot failed', err);
       } finally {
         if (alive) setReady(true);
       }
@@ -692,7 +700,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return { ...prev, downloads: { ...prev.downloads, [profile.id]: list } };
         });
       } catch (err) {
-        console.warn('[kidflix] download failed', err);
+        console.warn('[sproutscreen] download failed', err);
         setFamily((prev) => {
           if (!prev) return prev;
           const list = (prev.downloads[profile.id] ?? []).map((d) =>

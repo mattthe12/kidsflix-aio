@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -14,9 +14,10 @@ import {
 import { Screen, Card } from '../components/Screen';
 import { Logo } from '../components/Logo';
 import { BigButton, Chip } from '../components/BigButton';
-import { CATEGORY_MAP, allTitles } from '../data/catalog';
+import { allTitles } from '../data/catalog';
 import { colors, font, radius } from '../theme';
 import { useApp } from '../state/AppProvider';
+import { AdminContentScreen } from './AdminContentScreen';
 import { supabase } from '../lib/supabase';
 import {
   getAdminHealth,
@@ -38,6 +39,7 @@ const TABS: { id: AdminTab; label: string; emoji: string }[] = [
   { id: 'health', label: 'Health', emoji: '🩺' },
 ];
 
+// Existing Pages deployment; update this when the repository is renamed.
 const APP_URL = 'https://mattthe12.github.io/kidsflix-aio/';
 
 function dateLabel(value: string | null): string {
@@ -83,8 +85,6 @@ export function AdminDashboardScreen() {
   const [usersError, setUsersError] = useState('');
   const [pendingSuspend, setPendingSuspend] = useState<AdminUserRow | null>(null);
   const [actionNotice, setActionNotice] = useState('');
-  const [contentSearch, setContentSearch] = useState('');
-  const [linkStates, setLinkStates] = useState<Record<string, string>>({});
   const [audit, setAudit] = useState<{ action: string; created_at: string }[]>([]);
 
   const loadOverview = useCallback(async () => {
@@ -128,12 +128,6 @@ export function AdminDashboardScreen() {
     }
   }, [loadHealth, loadOverview, loadUsers]);
 
-  const filteredTitles = useMemo(() => {
-    const query = contentSearch.trim().toLowerCase();
-    if (!query) return allTitles;
-    return allTitles.filter((title) => `${title.name} ${title.category} ${title.subcategory}`.toLowerCase().includes(query));
-  }, [contentSearch]);
-
   const setSuspended = async (row: AdminUserRow) => {
     setPendingSuspend(null);
     setActionNotice('');
@@ -145,31 +139,6 @@ export function AdminDashboardScreen() {
     setActionNotice(result.message);
     await loadUsers(userSearch);
     await loadOverview();
-  };
-
-  const checkPlaybackLink = async (titleId: string) => {
-    const title = allTitles.find((item) => item.id === titleId);
-    const url = title?.episodes[0]?.mp4Url;
-    if (!url) {
-      setLinkStates((prev) => ({ ...prev, [titleId]: 'No playback URL configured' }));
-      return;
-    }
-    setLinkStates((prev) => ({ ...prev, [titleId]: 'Checking…' }));
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 8000);
-    try {
-      const response = await fetch(url, { method: 'HEAD', signal: controller.signal });
-      setLinkStates((prev) => ({
-        ...prev,
-        [titleId]: response.ok
-          ? `HTTP ${response.status}`
-          : `HTTP ${response.status} — host may block browser checks`,
-      }));
-    } catch {
-      setLinkStates((prev) => ({ ...prev, [titleId]: 'Could not verify from this browser' }));
-    } finally {
-      clearTimeout(timer);
-    }
   };
 
   const openApp = (url: string) => {
@@ -274,32 +243,7 @@ export function AdminDashboardScreen() {
     </>
   );
 
-  const renderContent = () => (
-    <>
-      <SectionTitle title="Catalogue" body="These are the real bundled titles. The catalogue is code-managed, so this build does not claim to edit it from the browser." />
-      <TextInput
-        value={contentSearch}
-        onChangeText={setContentSearch}
-        placeholder="Search titles or categories"
-        placeholderTextColor={colors.textFaint}
-        style={styles.searchInput}
-        accessibilityLabel="Search catalogue"
-      />
-      <Text style={styles.mutedLine}>{filteredTitles.length} titles shown · {Object.keys(CATEGORY_MAP).length} categories</Text>
-      {filteredTitles.slice(0, 80).map((title) => (
-        <Card key={title.id} style={styles.contentCard}>
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={styles.userEmail} numberOfLines={1}>{title.emoji} {title.name}</Text>
-            <Text style={styles.mutedLine}>{title.category} / {title.subcategory} · {title.rating} · {title.episodes.length} episode(s)</Text>
-            <Text style={styles.mutedLine} numberOfLines={1}>{title.episodes[0]?.mp4Url ?? 'No playback URL'}</Text>
-          </View>
-          <Pressable onPress={() => void checkPlaybackLink(title.id)} style={styles.smallAction} accessibilityRole="button">
-            <Text style={styles.smallActionText}>{linkStates[title.id] ?? 'Check link'}</Text>
-          </Pressable>
-        </Card>
-      ))}
-    </>
-  );
+  const renderContent = () => <AdminContentScreen />;
 
   const renderTesting = () => (
     <>
@@ -408,7 +352,6 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 12 },
   searchInput: { flex: 1, minWidth: 0, minHeight: 46, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, color: colors.white, fontFamily: font.semibold, fontSize: 14, paddingHorizontal: 13, paddingVertical: 10, marginBottom: 12 },
   userCard: { padding: 14, marginBottom: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
-  contentCard: { padding: 13, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 10 },
   userEmail: { fontFamily: font.bold, fontSize: 14, color: colors.white },
   smallAction: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 8, marginTop: 8 },
   smallActionText: { fontFamily: font.bold, fontSize: 12, color: colors.primarySoft },

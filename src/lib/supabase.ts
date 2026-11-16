@@ -24,7 +24,7 @@ if (isSupabaseConfigured) {
       },
     });
   } catch (err) {
-    console.warn('[kidflix] could not create Supabase client', err);
+    console.warn('[sproutscreen] could not create Supabase client', err);
   }
 }
 

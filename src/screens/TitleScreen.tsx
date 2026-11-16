@@ -230,7 +230,7 @@ export function TitleScreen({ titleId }: { titleId: string }) {
       />
 
       <Text style={styles.footer}>
-        KidsFlix streams openly licensed demo clips. Replace the media library with your own licensed catalogue before launch.
+        SproutScreen streams openly licensed demo clips. Replace the media library with your own licensed catalogue before launch.
       </Text>
     </Screen>
   );

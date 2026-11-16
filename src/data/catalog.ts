@@ -13,12 +13,12 @@ import { MEDIA_CLIPS, clipsForTitle, creditFor } from './media';
 import { captionsForClip } from './captions';
 
 /**
- * Demo catalogue for KidsFlix.
+ * Demo catalogue for SproutScreen.
  *
  * Cartoon and movie cards are real open or public-domain films with their
  * actual titles: Blender open movies (CC BY) and Ub Iwerks ComiColor cartoons
  * (public domain), one exact film per card. Learning, music and bedtime cards
- * are original KidsFlix demo shows that draw from themed NASA, NOAA and
+ * are original SproutScreen demo shows that draw from themed NASA, NOAA and
  * Prelinger clips. Swap the library for your own licensed catalogue in
  * production.
  */
@@ -315,9 +315,26 @@ export const titleById: Record<string, Title> = allTitles.reduce((acc, t) => {
   return acc;
 }, {} as Record<string, Title>);
 
+/** Immutable snapshot used for media metadata that predates managed content. */
+export const BUNDLED_TITLES: Title[] = allTitles.slice();
+
 export const FEATURED_IDS = ['big-buck-bunny', 'jack-and-the-beanstalk', 'spring', 'abc-adventure'];
 
-export const FEATURED = FEATURED_IDS.map((id) => titleById[id]).filter(Boolean);
+export const FEATURED: Title[] = FEATURED_IDS.map((id) => titleById[id]).filter(Boolean) as Title[];
+
+/**
+ * Replace the bundled catalogue with a published catalogue from Supabase.
+ * The exported arrays and index are mutated in place so existing screens and
+ * helpers keep working without threading a catalogue prop through the app.
+ */
+export function applyCatalog(next: Title[]): void {
+  allTitles.splice(0, allTitles.length, ...next);
+  for (const id of Object.keys(titleById)) delete titleById[id];
+  next.forEach((title) => {
+    titleById[title.id] = title;
+  });
+  FEATURED.splice(0, FEATURED.length, ...(FEATURED_IDS.map((id) => titleById[id]).filter(Boolean) as Title[]));
+}
 
 export function maxRatingForAge(age: AgeGroup): Rating {
   if (age === 'toddler') return 'G';

@@ -181,7 +181,7 @@ export function ParentGateScreen({ then }: { then: 'dashboard' | 'settings' | 's
             setPwError('');
           }}
           secure
-          placeholder="Your KidsFlix password"
+          placeholder="Your SproutScreen password"
           autoCapitalize="none"
         />
         {pwError ? <Text style={styles.pwError}>{pwError}</Text> : null}

@@ -45,7 +45,7 @@ export function HeroBanner({
         <View style={styles.badgeRow}>
           <View style={styles.originalBadge}>
             <Text style={styles.originalText}>
-              {title.category === 'cartoons' || title.category === 'movies' ? '🌟 OPEN CARTOON' : '🌟 KIDSFLIX SHOW'}
+              {title.category === 'cartoons' || title.category === 'movies' ? '🌟 OPEN CARTOON' : '🌟 SPROUTSCREEN SHOW'}
             </Text>
           </View>
           <View style={styles.rating}>

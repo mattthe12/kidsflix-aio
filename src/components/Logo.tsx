@@ -8,11 +8,11 @@ export function Logo({ size = 30, compact = false }: { size?: number; compact?: 
     <View style={styles.logoRow}>
       <View style={[styles.mark, { width: size * 1.15, height: size * 1.15, borderRadius: size * 0.34 }]}>
         <LinearGradient colors={['#FF5CA8', '#7C4DFF']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
-        <Text style={{ fontSize: size * 0.62 }}>⭐</Text>
+        <Text style={{ fontSize: size * 0.62 }}>🌱</Text>
       </View>
       {!compact && (
         <Text style={[styles.word, { fontSize: size }]}>
-          Kids<Text style={styles.wordAccent}>Flix</Text>
+          Sprout<Text style={styles.wordAccent}>Screen</Text>
         </Text>
       )}
     </View>

@@ -149,7 +149,7 @@ Deno.serve(async (req) => {
       {
         ok: false,
         code: 'not_configured',
-        error: 'SECURITY_ALERT_FROM must be a valid sender address, for example KidsFlix.Aio Security <parent@gmail.com>.',
+        error: 'SECURITY_ALERT_FROM must be a valid sender address, for example SproutScreen Security <parent@gmail.com>.',
       },
       503
     );
@@ -272,14 +272,14 @@ Deno.serve(async (req) => {
   const eventTime = formatEventTime(event.eventAt);
   const recipient = user.email;
   const subject = isTest
-    ? 'KidsFlix.Aio — Test Security Email'
-    : 'KidsFlix.Aio — Parent Account Security Alert';
+    ? 'SproutScreen — Test Security Email'
+    : 'SproutScreen — Parent Account Security Alert';
 
   const text = isTest
     ? [
         'Hello,',
         '',
-        'This is a test of the KidsFlix.Aio parent account security alert system.',
+        'This is a test of the SproutScreen parent account security alert system.',
         '',
         `Time: ${eventTime}`,
         'No PIN lockout occurred and no account changes were made.',
@@ -287,12 +287,12 @@ Deno.serve(async (req) => {
         'If you received this message but did not request it, you can ignore it or contact support.',
         'The parent PIN, password, authentication tokens and API keys are never included in security emails.',
         '',
-        'KidsFlix.Aio Security',
+        'SproutScreen Security',
       ].join('\n')
     : [
         'Hello,',
         '',
-        'Multiple incorrect parent PIN attempts occurred on your KidsFlix.Aio parent account, and the parent area was temporarily locked.',
+        'Multiple incorrect parent PIN attempts occurred on your SproutScreen parent account, and the parent area was temporarily locked.',
         '',
         `Time: ${eventTime}`,
         `Failed attempts: ${failedAttempts}`,
@@ -304,7 +304,7 @@ Deno.serve(async (req) => {
         'If this was you, you can try again when the countdown ends.',
         'If this was not you, wait for the lockout to finish, then open the Parent Dashboard and change the parent PIN. Also review your parent account password and sign out of devices you do not recognize.',
         '',
-        'KidsFlix.Aio Security',
+        'SproutScreen Security',
       ].join('\n');
 
   const details = isTest
@@ -320,11 +320,11 @@ Deno.serve(async (req) => {
 
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;color:#241447">
-      <div style="font-size:13px;letter-spacing:1px;color:#7C4DFF;font-weight:bold;margin-bottom:8px">KIDSFLIX.AIO</div>
+      <div style="font-size:13px;letter-spacing:1px;color:#7C4DFF;font-weight:bold;margin-bottom:8px">SPROUTSCREEN</div>
       <h2 style="margin:0 0 8px">${isTest ? 'Security email test' : 'Parent account security alert'}</h2>
       <p style="color:#555;margin:0 0 20px">${
         isTest
-          ? 'This message confirms that KidsFlix.Aio can send security alerts to your registered parent email.'
+          ? 'This message confirms that SproutScreen can send security alerts to your registered parent email.'
           : 'Repeated incorrect parent PIN attempts temporarily locked the parent area.'
       }</p>
       ${details}
@@ -333,7 +333,7 @@ Deno.serve(async (req) => {
           ? 'If you did not request this test, you can ignore it.'
           : 'If this activity was not authorized, secure the account as described above.'
       }</p>
-      <p style="margin:20px 0 0;color:#888;font-size:12px">KidsFlix.Aio Security</p>
+      <p style="margin:20px 0 0;color:#888;font-size:12px">SproutScreen Security</p>
     </div>`;
 
   const replyTo = Deno.env.get('SECURITY_ALERT_REPLY_TO')?.trim();
@@ -358,8 +358,8 @@ Deno.serve(async (req) => {
       ...(replyTo ? { replyTo } : {}),
       // Gmail does not provide an idempotency key. Reusing the event id in the
       // Message-ID gives retries the best chance of being treated as duplicates.
-      messageId: `<kidsflix-${event.id}@gmail.com>`,
-      headers: { 'X-KidsFlix-Event': event.id },
+      messageId: `<sproutscreen-${event.id}@gmail.com>`,
+      headers: { 'X-SproutScreen-Event': event.id },
     });
   } catch (error) {
     const code = String((error as { code?: string }).code ?? 'smtp_error').slice(0, 100);
@@ -392,7 +392,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  const providerMessageId = info.messageId || `kidsflix-${event.id}@gmail.com`;
+  const providerMessageId = info.messageId || `sproutscreen-${event.id}@gmail.com`;
   const providerResponse = {
     messageId: providerMessageId,
     response: sanitizeProviderMessage(String(info.response ?? '')).slice(0, 500),

@@ -126,7 +126,7 @@ export function ProfileScreen() {
       <Pressable onPress={signOut} style={styles.signOut} accessibilityRole="button">
         <Text style={styles.signOutText}>👋 {t('signOut')}</Text>
       </Pressable>
-      <Text style={styles.footer}>KidsFlix · no ads for kids, ever 💜</Text>
+      <Text style={styles.footer}>SproutScreen · no ads for kids, ever 💜</Text>
     </Screen>
   );
 }

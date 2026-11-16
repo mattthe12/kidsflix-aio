@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "KidsFlix",
+    "name": "SproutScreen",
     "slug": "kidsflix-aio",
     "scheme": "kidsflixaio",
     "version": "2.0.0",
@@ -31,7 +31,7 @@
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png",
-      "name": "KidsFlix — safe streaming for kids",
+      "name": "SproutScreen — safe streaming for kids",
       "themeColor": "#150C31",
       "backgroundColor": "#150C31"
     },

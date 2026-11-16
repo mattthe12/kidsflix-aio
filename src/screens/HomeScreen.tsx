@@ -248,7 +248,7 @@ export function HomeScreen() {
         </View>
       ) : null}
 
-      <Text style={styles.footer}>Made with 💜 for little dreamers · KidsFlix</Text>
+      <Text style={styles.footer}>Made with 💜 for little dreamers · SproutScreen</Text>
     </Screen>
   );
 }

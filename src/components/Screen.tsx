@@ -76,7 +76,7 @@ export function TopBar({
           <Pressable
             onPress={() => nav.setTab('home')}
             accessibilityRole="button"
-            accessibilityLabel="KidsFlix home"
+            accessibilityLabel="SproutScreen home"
             hitSlop={6}
           >
             <Logo size={26} compact={responsive.width < 370} />

@@ -1,7 +1,7 @@
 import { Platform } from 'react-native';
 
 /**
- * KidsFlix design tokens.
+ * SproutScreen design tokens.
  * Bright, candy-coloured, chunky and friendly — big type, soft shadows, round shapes.
  */
 export const colors = {

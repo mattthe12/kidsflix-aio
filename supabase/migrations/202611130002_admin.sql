@@ -1,5 +1,5 @@
 -- =============================================================================
--- KidsFlix administrator role, bootstrap completion and admin read models.
+-- SproutScreen administrator role, bootstrap completion and admin read models.
 --
 -- Security model:
 --   * admin_users is server-owned. Clients may only read their own row.

@@ -558,7 +558,7 @@ export function ParentDashboardScreen() {
             <Card style={styles.passwordCard}>
               <Text style={styles.cardLabel}>ACCOUNT PASSWORD</Text>
               <Text style={styles.securityCopy}>
-                Change the password you use to sign in. Your current password is required, and KidsFlix never stores
+                Change the password you use to sign in. Your current password is required, and SproutScreen never stores
                 or displays the new one. Changing it does not reset kid profiles, favorites, downloads or watch history.
               </Text>
               <BigButton
@@ -636,7 +636,7 @@ export function ParentDashboardScreen() {
             <View style={styles.legalCard}>
               <Text style={styles.legalTitle}>Child privacy & safety</Text>
               <Text style={styles.legalText}>
-                KidsFlix is designed for children’s privacy. Kid profiles do not require email addresses, phone numbers, photos or
+                SproutScreen is designed for children’s privacy. Kid profiles do not require email addresses, phone numbers, photos or
                 location. We do not show behavioural advertising to children and there are no public profiles, comments, chat or
                 messaging features. Watch history is visible only to the parent account holder and can be deleted at any time.
               </Text>

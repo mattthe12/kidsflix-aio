@@ -10,7 +10,7 @@ const en: Dict = {
   profile: 'Profile',
   search: 'Search',
   searchPlaceholder: 'Find a show, movie or song…',
-  welcome: 'Welcome to KidsFlix',
+  welcome: 'Welcome to SproutScreen',
   tagline: 'A magical world of safe watching, learning and giggles.',
   getStarted: 'Start exploring',
   haveAccount: 'I already have an account',
@@ -132,7 +132,7 @@ const en: Dict = {
 const es: Dict = {
   home: 'Inicio', shows: 'Series', learning: 'Aprender', favorites: 'Favoritos', profile: 'Perfil',
   search: 'Buscar', searchPlaceholder: 'Busca una serie, película o canción…',
-  welcome: 'Bienvenido a KidsFlix', tagline: 'Un mundo mágico para ver, aprender y reír con seguridad.',
+  welcome: 'Bienvenido a SproutScreen', tagline: 'Un mundo mágico para ver, aprender y reír con seguridad.',
   getStarted: 'Empezar a explorar', haveAccount: 'Ya tengo una cuenta',
   continueWatching: 'Seguir viendo', popular: 'Popular ahora', recommended: 'Recomendado para ti',
   recentlyAdded: 'Añadido hace poco', favoriteShows: 'Tus favoritos', play: 'Reproducir',
@@ -179,7 +179,7 @@ const es: Dict = {
 const fr: Dict = {
   home: 'Accueil', shows: 'Séries', learning: 'Apprendre', favorites: 'Favoris', profile: 'Profil',
   search: 'Rechercher', searchPlaceholder: 'Trouve une série, un film ou une chanson…',
-  welcome: 'Bienvenue sur KidsFlix', tagline: 'Un monde magique pour regarder, apprendre et rire en sécurité.',
+  welcome: 'Bienvenue sur SproutScreen', tagline: 'Un monde magique pour regarder, apprendre et rire en sécurité.',
   getStarted: "Commencer l'aventure", haveAccount: "J'ai déjà un compte",
   continueWatching: 'Reprendre', popular: 'Populaire maintenant', recommended: 'Recommandé pour toi',
   recentlyAdded: 'Nouveautés', favoriteShows: 'Tes favoris', play: 'Lire', resume: 'Reprendre',

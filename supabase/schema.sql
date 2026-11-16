@@ -1,5 +1,5 @@
 -- =============================================================================
--- KidsFlix — Supabase schema
+-- SproutScreen — Supabase schema
 -- Run in the Supabase SQL editor, or: supabase db push
 --
 -- Design notes
@@ -412,7 +412,7 @@ group by p.account_id, p.id, p.name;
 --   * Enable "Confirm email" for real deployments.
 --   * Set a minimum password length of 8.
 -- Dashboard → Authentication → URL Configuration:
---   * Add the kidsflixaio:// deep link for password recovery.
+--   * Keep the existing kidsflixaio:// deep link for password recovery.
 
 
 -- =============================================================================

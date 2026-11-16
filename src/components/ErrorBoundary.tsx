@@ -15,7 +15,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   }
 
   componentDidCatch(error: Error) {
-    console.warn('[kidsflixaio] render error', error);
+    console.warn('[sproutscreen] render error', error);
   }
 
   render() {

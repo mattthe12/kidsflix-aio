@@ -77,7 +77,7 @@ export function SettingsScreen() {
         <Card style={{ marginTop: 8, marginBottom: 16 }}>
           <Text style={styles.cardLabel}>PRIVACY & LEGAL</Text>
           <Text style={styles.legal}>
-            KidsFlix does not serve targeted advertising to children and has no public messaging, comments or social profiles.
+            SproutScreen does not serve targeted advertising to children and has no public messaging, comments or social profiles.
             Kid profiles collect only a first name, a cartoon avatar and an age band. Watch history and favourites are visible only
             to the parent account and can be deleted from the dashboard.
           </Text>
@@ -90,7 +90,7 @@ export function SettingsScreen() {
             ComiColor cartoons, NASA, NOAA and Prelinger Archives (public domain). The player shows
             the exact clip credit.
           </Text>
-          <Text style={styles.version}>KidsFlix v2.0.0 · Expo SDK 58 · {isDemo ? 'local demo mode' : 'Supabase connected'}</Text>
+          <Text style={styles.version}>SproutScreen v2.0.0 · Expo SDK 58 · {isDemo ? 'local demo mode' : 'Supabase connected'}</Text>
         </Card>
 
         <BigButton label={t('signOut')} variant="ghost" onPress={signOut} />

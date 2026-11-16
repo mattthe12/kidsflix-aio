@@ -68,7 +68,7 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
           'short-password': t('shortPassword'),
           'wrong-password': 'That email or username and password do not match. Try again.',
           'no-account': 'We could not find an account with that email or administrator username.',
-          duplicate: 'That email already has a KidsFlix account. Try signing in.',
+          duplicate: 'That email already has a SproutScreen account. Try signing in.',
           unconfirmed: 'Please confirm your email address first. Check your inbox, then try again.',
           'rate-limit': 'Too many sign-in attempts. Wait a few minutes and try again.',
           network: 'Could not reach the sign-in service. Check your mobile connection and try again.',
@@ -124,7 +124,7 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
             </Text>
             <Text style={styles.subtitle}>
               {isRecover
-                ? 'Enter the grown-up email for your KidsFlix account and we will send a reset link.'
+                ? 'Enter the grown-up email for your SproutScreen account and we will send a reset link.'
                 : mode === 'signup'
                   ? 'One grown-up account holds every kid profile, parental control and download.'
                   : 'Sign in to manage profiles, screen time and your kids’ favourites.'}

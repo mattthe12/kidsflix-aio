@@ -246,13 +246,13 @@ export const pinSecurity = {
           return invocation.data.deduplicated ? 'deduplicated' : 'accepted';
         }
         const status = failureStatus(invocation);
-        console.warn('[kidflix] parent security email not accepted', {
+        console.warn('[sproutscreen] parent security email not accepted', {
           status,
           code: typeof invocation.data?.code === 'string' ? invocation.data.code : undefined,
         });
         return status;
       } catch {
-        console.warn('[kidflix] parent security email request failed');
+        console.warn('[sproutscreen] parent security email request failed');
         return 'failed';
       }
     })();

@@ -9,7 +9,7 @@ import { isSupabaseConfigured, supabase } from './supabase';
 const enabled = isSupabaseConfigured && Boolean(supabase);
 
 function log(table: string, error: unknown) {
-  console.warn(`[kidflix] Supabase sync skipped (${table})`, error);
+  console.warn(`[sproutscreen] Supabase sync skipped (${table})`, error);
 }
 
 export const remote = {
@@ -244,7 +244,7 @@ export const remote = {
 
       return result;
     } catch (err) {
-      console.warn('[kidflix] could not pull Supabase data', err);
+      console.warn('[sproutscreen] could not pull Supabase data', err);
       return null;
     }
   },

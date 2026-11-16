@@ -1,4 +1,4 @@
-# KidsFlix 🌈
+# SproutScreen 🌱
 
 A complete kids' streaming app — **React Native + Expo + TypeScript**, with real video
 playback, real accounts, kid profiles, parental controls, screen-time limits, offline
@@ -77,6 +77,18 @@ controls and parent analytics. Everything from 1.x is still here.
   restarts. A successful PIN clears the counter. Email alerts are intentionally
   disabled in this build.
 
+### Catalogue administration
+- The admin dashboard **Content** tab lists every title, including drafts, and lets an admin
+  add a title or edit its category, rating, artwork, description and episode list.
+- **Save draft** writes to `draft_payload`; the live `payload` stays unchanged. **Publish**
+  validates categories, ratings, episode media URLs and copies the draft live. Unpublish
+  removes a title from the public catalogue without deleting it.
+- Draft rows and `draft_payload` are not readable with the anon key. All writes go through
+  admin-only security-definer RPCs, and publish/unpublish actions are audited in
+  `admin_actions`.
+- The app refreshes the published catalogue on each start; a last-good cache keeps the last
+  published list available if the network is unavailable.
+
 ### Accounts, subscription
 - Parent sign-up / sign-in / sign-out, password recovery (Gmail SMTP), persistent session.
 - Subscription screen with monthly/yearly plans, trial countdown, billing summary and
@@ -134,13 +146,21 @@ Create `.env` from `.env.example` before starting to enable Supabase / Stripe. E
    `kid_profiles`, `parent_settings`, `watch_progress`, `favorites`, `watchlist`,
    `content_approvals`, `watch_history`, `downloads`, a signup trigger, a summary view
    and RLS policies scoping every row to `auth.uid()`.
-3. Enable Email auth. For production enable "Confirm email" and set a minimum password length.
-4. Add the project URL and anon key to `.env`:
+3. Run every file in [`supabase/migrations/`](supabase/migrations/) in filename order. The
+   content migrations add the `content_titles` catalogue, admin RPCs and its grant rules.
+   Then optionally run [`supabase/seed/202611160001_content_catalog.sql`](supabase/seed/202611160001_content_catalog.sql)
+   to seed the 54 launch titles; you can also add titles from the admin Content tab.
+4. Enable Email auth. For production enable "Confirm email" and set a minimum password length.
+5. Add the project URL and anon key to `.env`:
    ```
    EXPO_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
    EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJ...
    ```
-5. Restart Expo.
+6. Restart Expo.
+
+The content catalogue is read from Supabase at boot and cached on the device, with the
+bundled catalogue as an offline fallback. Editing a title does not require rebuilding the
+app: save a draft, then publish it from the admin dashboard.
 
 With Supabase configured, the app authenticates through Supabase, restores sessions, and
 mirrors every mutation (profiles, settings, progress, favorites, watchlist, history,
@@ -194,7 +214,7 @@ them. The demo library is a legally usable starting point, not a production cata
 space and bedtime map to genuinely topical films. Counting episodes use a real NASA launch
 countdown and moon-phase lesson; dance and music episodes use music-driven animated shorts
 because no free, licensed nursery-rhyme/dance video with a reusable licence was found. The
-KidsFlix characters remain original; the demo clips are stand-ins for commissioned episodes.
+SproutScreen characters remain original; the demo clips are stand-ins for commissioned episodes.
 
 ### 3. Payments (Stripe)
 
@@ -241,7 +261,7 @@ sends it to the registered Supabase Auth email address.
    - Username: the full Gmail address
    - Password: the 16-character Gmail App Password
    - Sender email: the same Gmail address
-   - Sender name: `KidsFlix.Aio Security`
+   - Sender name: `SproutScreen Security`
 
    This makes password-reset mail use the same single sender. No domain is needed.
 4. Set the Edge Function secrets (never `EXPO_PUBLIC_*`):
@@ -251,7 +271,7 @@ sends it to the registered Supabase Auth email address.
    supabase secrets set SMTP_SECURE=true
    supabase secrets set SMTP_USERNAME=your-account@gmail.com
    supabase secrets set SMTP_PASSWORD="your 16-character app password"
-   supabase secrets set SECURITY_ALERT_FROM="KidsFlix.Aio Security <your-account@gmail.com>"
+   supabase secrets set SECURITY_ALERT_FROM="SproutScreen Security <your-account@gmail.com>"
    supabase secrets set SECURITY_ALERT_REPLY_TO=your-account@gmail.com   # optional
    supabase functions deploy pin-security-alert
    ```
@@ -305,14 +325,17 @@ src/
   lib/pinLockout.ts         Pure 3-strike/doubling lockout rules + countdown math
   lib/pinSecurity.ts        Backend PIN verification, local mirror, alert call
   lib/remote.ts             Best-effort Supabase mirror + pull
+  lib/content.ts            Published catalogue load/cache + admin content RPCs
   lib/downloads.ts          Native file downloads / web IndexedDB offline
   lib/storage.ts            AsyncStorage family state + defaults
   lib/i18n.ts               EN / ES / FR UI strings
   state/AppProvider.tsx     Single source of truth for profiles, limits, data
   components/               Logo, avatars, poster art, rails, buttons, seek bar, sheets…
-  screens/                  All 19 screens (see above)
+  screens/                  All screens, including AdminContentScreen
 supabase/
   schema.sql                Tables, trigger, RLS, PIN lockout RPCs
+  seed/                     Launch content catalogue seed
+  migrations/               Alerts, admin access and content catalogue migrations
   functions/stripe-checkout Stripe Checkout session creator
   functions/stripe-webhook  Subscription sync (signature verified)
   functions/pin-security-alert Event-based Gmail security email + diagnostics
@@ -328,9 +351,12 @@ Tests for the shared lockout rules: `npm run test:pin` (no network or database r
 
 - **Catalogue is demo content.** Cartoon and movie cards are real public-domain or
   Creative Commons films (22 titles, one exact film each). The 32 learning, music and
-  bedtime cards are KidsFlix demo brands that stream 19 themed open clips. Counting uses a
+  bedtime cards are SproutScreen demo brands that stream 19 themed open clips. Counting uses a
   launch countdown and moon phases; dance/music use music-driven animation. Replace those
   with commissioned or licensed episodes before launch.
+- **The admin editor covers title and episode metadata, not caption tracks or file uploads.**
+  Episodes still need absolute HTTPS media URLs; captions come from the bundled tracks or the
+  episode's existing payload. Existing title/account data remains untouched by catalogue edits.
 - **UI localisation is partial.** Navigation, core actions and common labels are translated
   to English/Spanish/French; show descriptions, parent dashboard copy and legal text remain
   English. CC coverage depends on the source: NASA, Wikimedia Commons (Big Buck Bunny,
@@ -359,7 +385,7 @@ Tests for the shared lockout rules: `npm run test:pin` (no network or database r
   episodes download fine, but Internet Archive does not send CORS for its MP4 files, so
   those clips download only in the native app. Use your own Mux/CORS-enabled host in
   production to make every title downloadable on every platform.
-- **Icons/splash** use the generated Expo assets; replace `assets/*.png` with KidsFlix
+- **Icons/splash** use the generated Expo assets; replace `assets/*.png` with SproutScreen
   branding before store submission.
 
 ---
@@ -368,6 +394,11 @@ Tests for the shared lockout rules: `npm run test:pin` (no network or database r
 
 - `npx tsc --noEmit` passes with strict TypeScript.
 - `npm run build:web` produces a fresh `dist/` export.
+- Managed catalogue against the live Supabase project: 54 published rows load into the app cache;
+  anonymous reads return the published payload, while `draft_payload` and admin RPCs are denied.
+  A save-draft → publish → anonymous-visible admin RPC flow was exercised inside a rolled-back
+  transaction and left no test rows. The admin form itself was typechecked and bundled, but not
+  clicked through with a live administrator login in this pass.
 - Responsive checks: Home at 320×568, 360×640, 375×812, 390×844, 412×915, 430×932,
   600×960, 768×1024, 800×1280, 1024×1366, 1280×720, 1366×768, 1920×1080 and 844×390
   landscape — no page-level horizontal overflow at any of them. The profile editor was checked
@@ -383,8 +414,8 @@ Tests for the shared lockout rules: `npm run test:pin` (no network or database r
 - Download on web for Internet Archive titles is blocked by CORS and is reported in the UI;
   native download and actual Android/iOS builds were not tested here.
 
-Anything requiring Supabase, Mux dashboard access, Stripe keys or store accounts is
-documented above and still needs your credentials to verify end-to-end.
+Anything requiring Mux dashboard access, Stripe keys or store accounts is documented
+above and still needs your credentials to verify end-to-end.
 
 ---
 

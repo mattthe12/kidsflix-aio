@@ -23,7 +23,7 @@ export const storage = {
     try {
       await AsyncStorage.setItem(key, JSON.stringify(value));
     } catch (err) {
-      console.warn('[kidflix] storage write failed', err);
+      console.warn('[sproutscreen] storage write failed', err);
     }
   },
   remove: async (key: string): Promise<void> => {

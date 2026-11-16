@@ -64,7 +64,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * The URL Supabase should return the browser to after an email link. Build it
  * from the current page's directory so links keep the GitHub Pages base path
- * (for example /kidsflix-aio/) instead of falling back to the site root.
+ * (for example the current /kidsflix-aio/ deployment path) instead of the site root.
  */
 function emailReturnUrl(): string | undefined {
   if (Platform.OS !== 'web' || typeof window === 'undefined') return undefined;
