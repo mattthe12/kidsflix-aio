@@ -142,6 +142,16 @@ export async function addAdminAccount(
   return { ok: true, message: 'Administrator added.' };
 }
 
+export async function removeAdminAccount(
+  userId: string
+): Promise<{ ok: boolean; message: string }> {
+  const sb = client();
+  if (!sb) return { ok: false, message: 'Supabase is not configured.' };
+  const { error } = await sb.rpc('admin_remove_admin', { p_user_id: userId });
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: 'Administrator access removed.' };
+}
+
 export async function getAdminHealth(): Promise<AdminHealth | null> {
   const sb = client();
   if (!sb) return null;

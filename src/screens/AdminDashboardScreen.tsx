@@ -21,6 +21,7 @@ import { AdminContentScreen } from './AdminContentScreen';
 import { supabase } from '../lib/supabase';
 import {
   addAdminAccount,
+  removeAdminAccount,
   getAdminHealth,
   getAdminOverview,
   listAdminUsers,
@@ -91,8 +92,10 @@ export function AdminDashboardScreen() {
   const [usersError, setUsersError] = useState('');
   const [pendingSuspend, setPendingSuspend] = useState<AdminUserRow | null>(null);
   const [pendingAdmin, setPendingAdmin] = useState<AdminUserRow | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<AdminUserRow | null>(null);
   const [newAdminUsername, setNewAdminUsername] = useState('');
   const [adminBusy, setAdminBusy] = useState(false);
+  const [removeBusy, setRemoveBusy] = useState(false);
   const [actionNotice, setActionNotice] = useState('');
   const [audit, setAudit] = useState<{ action: string; created_at: string }[]>([]);
 
@@ -163,6 +166,23 @@ export function AdminDashboardScreen() {
     setActionNotice(`@${newAdminUsername.trim().toLowerCase()} can now sign in as an administrator with that username or their email.`);
     setPendingAdmin(null);
     setNewAdminUsername('');
+    await loadUsers(userSearch);
+    await loadOverview();
+  };
+
+  const removeAdmin = async () => {
+    if (!pendingRemove || removeBusy) return;
+    const target = pendingRemove;
+    setRemoveBusy(true);
+    setActionNotice('');
+    const result = await removeAdminAccount(target.user_id);
+    setRemoveBusy(false);
+    if (!result.ok) {
+      setActionNotice(result.message);
+      return;
+    }
+    setActionNotice(`${target.email} is no longer an administrator.`);
+    setPendingRemove(null);
     await loadUsers(userSearch);
     await loadOverview();
   };
@@ -278,33 +298,66 @@ export function AdminDashboardScreen() {
               {row.suspended ? 'Suspended' : 'Active'}{row.is_admin ? ' · Administrator' : ''}
             </Text>
           </View>
-          {!row.is_admin ? (
-            <View style={styles.rowActions}>
+          <View style={styles.rowActions}>
+            {!row.is_admin ? (
+              <>
+                <Pressable
+                  onPress={() => {
+                    setPendingAdmin(row);
+                    setPendingRemove(null);
+                    setNewAdminUsername(suggestedAdminUsername(row.email));
+                    setPendingSuspend(null);
+                    setActionNotice('');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Make ${row.email} an administrator`}
+                  style={styles.smallAction}
+                >
+                  <Text style={styles.smallActionText}>Make admin</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setPendingSuspend(row);
+                    setPendingAdmin(null);
+                    setPendingRemove(null);
+                    setActionNotice('');
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${row.suspended ? 'Reactivate' : 'Suspend'} ${row.email}`}
+                  style={styles.smallAction}
+                >
+                  <Text style={styles.smallActionText}>{row.suspended ? 'Reactivate' : 'Suspend'}</Text>
+                </Pressable>
+              </>
+            ) : row.user_id !== admin?.userId ? (
               <Pressable
                 onPress={() => {
-                  setPendingAdmin(row);
-                  setNewAdminUsername(suggestedAdminUsername(row.email));
+                  setPendingRemove(row);
+                  setPendingAdmin(null);
                   setPendingSuspend(null);
                   setActionNotice('');
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`Make ${row.email} an administrator`}
+                accessibilityLabel={`Remove administrator access from ${row.email}`}
                 style={styles.smallAction}
               >
-                <Text style={styles.smallActionText}>Make admin</Text>
+                <Text style={styles.dangerActionText}>Remove admin</Text>
               </Pressable>
-              <Pressable
-                onPress={() => {
-                  setPendingSuspend(row);
-                  setPendingAdmin(null);
-                  setActionNotice('');
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`${row.suspended ? 'Reactivate' : 'Suspend'} ${row.email}`}
-                style={styles.smallAction}
-              >
-                <Text style={styles.smallActionText}>{row.suspended ? 'Reactivate' : 'Suspend'}</Text>
-              </Pressable>
+            ) : null}
+          </View>
+          {pendingRemove?.user_id === row.user_id ? (
+            <View style={styles.confirmBox}>
+              <Text style={styles.mutedLine}>
+                Remove administrator access from this account? They keep their parent account and can still sign in normally.
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                <Pressable onPress={() => void removeAdmin()} style={styles.confirmAction}>
+                  <Text style={styles.confirmActionText}>{removeBusy ? 'Removing…' : 'Remove admin'}</Text>
+                </Pressable>
+                <Pressable onPress={() => setPendingRemove(null)} style={styles.smallAction}>
+                  <Text style={styles.smallActionText}>Cancel</Text>
+                </Pressable>
+              </View>
             </View>
           ) : null}
           {pendingSuspend?.user_id === row.user_id ? (
@@ -439,6 +492,7 @@ const styles = StyleSheet.create({
   formActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   smallAction: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 8, marginTop: 8 },
   smallActionText: { fontFamily: font.bold, fontSize: 12, color: colors.primarySoft },
+  dangerActionText: { fontFamily: font.bold, fontSize: 12, color: '#FFB3B9' },
   confirmBox: { width: '100%', paddingTop: 8 },
   confirmAction: { borderRadius: radius.pill, backgroundColor: colors.danger, paddingHorizontal: 12, paddingVertical: 8 },
   confirmActionText: { fontFamily: font.bold, fontSize: 12, color: colors.white },
