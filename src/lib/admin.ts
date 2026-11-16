@@ -130,9 +130,13 @@ export async function addAdminAccount(
 ): Promise<{ ok: boolean; message: string }> {
   const sb = client();
   if (!sb) return { ok: false, message: 'Supabase is not configured.' };
+  const clean = username.trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9_]{2,31}$/.test(clean)) {
+    return { ok: false, message: 'Use 3–32 lowercase letters, numbers or underscores, starting with a letter or number.' };
+  }
   const { error } = await sb.rpc('admin_add_admin', {
     p_user_id: userId,
-    p_username: username.trim().toLowerCase(),
+    p_username: clean,
   });
   if (error) return { ok: false, message: error.message };
   return { ok: true, message: 'Administrator added.' };

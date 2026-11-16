@@ -33,7 +33,8 @@ import {
 type AdminTab = 'overview' | 'users' | 'content' | 'testing' | 'health';
 
 function suggestedAdminUsername(email: string): string {
-  return email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[^a-z0-9]+/, '').slice(0, 32) || 'developer';
+  const base = email.split('@')[0].toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^[^a-z0-9]+/, '').slice(0, 32);
+  return base.padEnd(3, '_') || 'developer';
 }
 
 const TABS: { id: AdminTab; label: string; emoji: string }[] = [
@@ -159,7 +160,7 @@ export function AdminDashboardScreen() {
       setActionNotice(result.message);
       return;
     }
-    setActionNotice(`@${newAdminUsername.trim().toLowerCase()} can now sign in as an administrator using their existing password.`);
+    setActionNotice(`@${newAdminUsername.trim().toLowerCase()} can now sign in as an administrator with that username or their email.`);
     setPendingAdmin(null);
     setNewAdminUsername('');
     await loadUsers(userSearch);
@@ -212,7 +213,7 @@ export function AdminDashboardScreen() {
 
   const renderUsers = () => (
     <>
-      <SectionTitle title="Parent accounts" body="Search for an existing account and make it an administrator. Devs keep their existing password and can sign in with their email or the username you assign. Passwords, hashes, PINs and tokens are never selected." />
+      <SectionTitle title="Parent accounts" body="Search for an existing account and make it an administrator. Devs sign in with their email or the username you assign. Passwords, hashes, PINs and tokens are never selected." />
       <View style={styles.searchRow}>
         <TextInput
           value={userSearch}
@@ -235,12 +236,12 @@ export function AdminDashboardScreen() {
           <Text style={styles.panelTitle}>Make administrator</Text>
           <Text style={styles.mutedLine}>{pendingAdmin.email}</Text>
           <Text style={styles.mutedLine}>
-            They keep their existing password. They can sign in with this username or their email.
+            They can sign in with this username or their email using their existing password.
           </Text>
           <TextInput
             value={newAdminUsername}
             onChangeText={setNewAdminUsername}
-            placeholder="admin username"
+            placeholder="3-32 letters, numbers or underscores"
             placeholderTextColor={colors.textFaint}
             autoCapitalize="none"
             autoCorrect={false}
