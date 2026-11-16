@@ -20,6 +20,7 @@ import { useApp } from '../state/AppProvider';
 import { AdminContentScreen } from './AdminContentScreen';
 import { supabase } from '../lib/supabase';
 import {
+  addAdminAccount,
   getAdminHealth,
   getAdminOverview,
   listAdminUsers,
@@ -30,6 +31,10 @@ import {
 } from '../lib/admin';
 
 type AdminTab = 'overview' | 'users' | 'content' | 'testing' | 'health';
+
+function suggestedAdminUsername(email: string): string {
+  return email.split('@')[0].toLowerCase().replace(/[^a-z0-9._-]/g, '').replace(/^[^a-z0-9]+/, '').slice(0, 32) || 'developer';
+}
 
 const TABS: { id: AdminTab; label: string; emoji: string }[] = [
   { id: 'overview', label: 'Overview', emoji: '📊' },
@@ -84,6 +89,9 @@ export function AdminDashboardScreen() {
   const [usersBusy, setUsersBusy] = useState(false);
   const [usersError, setUsersError] = useState('');
   const [pendingSuspend, setPendingSuspend] = useState<AdminUserRow | null>(null);
+  const [pendingAdmin, setPendingAdmin] = useState<AdminUserRow | null>(null);
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [adminBusy, setAdminBusy] = useState(false);
   const [actionNotice, setActionNotice] = useState('');
   const [audit, setAudit] = useState<{ action: string; created_at: string }[]>([]);
 
@@ -141,6 +149,23 @@ export function AdminDashboardScreen() {
     await loadOverview();
   };
 
+  const makeAdmin = async () => {
+    if (!pendingAdmin || adminBusy) return;
+    setAdminBusy(true);
+    setActionNotice('');
+    const result = await addAdminAccount(pendingAdmin.user_id, newAdminUsername);
+    setAdminBusy(false);
+    if (!result.ok) {
+      setActionNotice(result.message);
+      return;
+    }
+    setActionNotice(`@${newAdminUsername.trim().toLowerCase()} can now sign in as an administrator using their existing password.`);
+    setPendingAdmin(null);
+    setNewAdminUsername('');
+    await loadUsers(userSearch);
+    await loadOverview();
+  };
+
   const openApp = (url: string) => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') window.open(url, '_blank', 'noopener,noreferrer');
     else void Linking.openURL(url);
@@ -187,7 +212,7 @@ export function AdminDashboardScreen() {
 
   const renderUsers = () => (
     <>
-      <SectionTitle title="Parent accounts" body="Emails and status are only available through the admin_list_users RPC. Passwords, hashes, PINs and tokens are never selected." />
+      <SectionTitle title="Parent accounts" body="Search for an existing account and make it an administrator. Devs keep their existing password and can sign in with their email or the username you assign. Passwords, hashes, PINs and tokens are never selected." />
       <View style={styles.searchRow}>
         <TextInput
           value={userSearch}
@@ -205,6 +230,43 @@ export function AdminDashboardScreen() {
       {usersBusy ? <ActivityIndicator color={colors.pink} style={{ marginVertical: 16 }} /> : null}
       {usersError ? <Text style={styles.error}>{usersError}</Text> : null}
       {actionNotice ? <Text style={styles.notice}>{actionNotice}</Text> : null}
+      {pendingAdmin ? (
+        <Card style={styles.panel}>
+          <Text style={styles.panelTitle}>Make administrator</Text>
+          <Text style={styles.mutedLine}>{pendingAdmin.email}</Text>
+          <Text style={styles.mutedLine}>
+            They keep their existing password. They can sign in with this username or their email.
+          </Text>
+          <TextInput
+            value={newAdminUsername}
+            onChangeText={setNewAdminUsername}
+            placeholder="admin username"
+            placeholderTextColor={colors.textFaint}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={styles.searchInput}
+            accessibilityLabel="New administrator username"
+          />
+          <View style={styles.formActions}>
+            <BigButton
+              label={adminBusy ? 'Adding…' : 'Add administrator'}
+              onPress={() => void makeAdmin()}
+              size="sm"
+              full={false}
+            />
+            <BigButton
+              label="Cancel"
+              onPress={() => {
+                setPendingAdmin(null);
+                setNewAdminUsername('');
+              }}
+              size="sm"
+              full={false}
+              variant="soft"
+            />
+          </View>
+        </Card>
+      ) : null}
       {users.map((row) => (
         <Card key={row.user_id} style={styles.userCard}>
           <View style={{ flex: 1, minWidth: 0 }}>
@@ -216,14 +278,33 @@ export function AdminDashboardScreen() {
             </Text>
           </View>
           {!row.is_admin ? (
-            <Pressable
-              onPress={() => setPendingSuspend(row)}
-              accessibilityRole="button"
-              accessibilityLabel={`${row.suspended ? 'Reactivate' : 'Suspend'} ${row.email}`}
-              style={styles.smallAction}
-            >
-              <Text style={styles.smallActionText}>{row.suspended ? 'Reactivate' : 'Suspend'}</Text>
-            </Pressable>
+            <View style={styles.rowActions}>
+              <Pressable
+                onPress={() => {
+                  setPendingAdmin(row);
+                  setNewAdminUsername(suggestedAdminUsername(row.email));
+                  setPendingSuspend(null);
+                  setActionNotice('');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`Make ${row.email} an administrator`}
+                style={styles.smallAction}
+              >
+                <Text style={styles.smallActionText}>Make admin</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setPendingSuspend(row);
+                  setPendingAdmin(null);
+                  setActionNotice('');
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${row.suspended ? 'Reactivate' : 'Suspend'} ${row.email}`}
+                style={styles.smallAction}
+              >
+                <Text style={styles.smallActionText}>{row.suspended ? 'Reactivate' : 'Suspend'}</Text>
+              </Pressable>
+            </View>
           ) : null}
           {pendingSuspend?.user_id === row.user_id ? (
             <View style={styles.confirmBox}>
@@ -353,6 +434,8 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, minWidth: 0, minHeight: 46, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.card, color: colors.white, fontFamily: font.semibold, fontSize: 14, paddingHorizontal: 13, paddingVertical: 10, marginBottom: 12 },
   userCard: { padding: 14, marginBottom: 10, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   userEmail: { fontFamily: font.bold, fontSize: 14, color: colors.white },
+  rowActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  formActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   smallAction: { borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 11, paddingVertical: 8, marginTop: 8 },
   smallActionText: { fontFamily: font.bold, fontSize: 12, color: colors.primarySoft },
   confirmBox: { width: '100%', paddingTop: 8 },

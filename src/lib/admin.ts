@@ -124,6 +124,20 @@ export async function setAdminUserSuspended(
   return { ok: true, message: suspended ? 'Account suspended.' : 'Account reactivated.' };
 }
 
+export async function addAdminAccount(
+  userId: string,
+  username: string
+): Promise<{ ok: boolean; message: string }> {
+  const sb = client();
+  if (!sb) return { ok: false, message: 'Supabase is not configured.' };
+  const { error } = await sb.rpc('admin_add_admin', {
+    p_user_id: userId,
+    p_username: username.trim().toLowerCase(),
+  });
+  if (error) return { ok: false, message: error.message };
+  return { ok: true, message: 'Administrator added.' };
+}
+
 export async function getAdminHealth(): Promise<AdminHealth | null> {
   const sb = client();
   if (!sb) return null;
