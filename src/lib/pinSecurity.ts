@@ -267,12 +267,43 @@ export const pinSecurity = {
 
   /**
    * Retry the newest failed event after its backoff. Called once when a parent
-   * session boots; the server decides whether any event is eligible, so this
-   * cannot create a second alert for an event Gmail already accepted.
+   * session boots. Check for an eligible event first: invoking the function
+   * with nothing to send is expected to fail with 409, which browsers report
+   * as a console error even though it is a harmless no-op. The server still
+   * rechecks eligibility and deduplicates an alert Gmail already accepted.
    */
-  async retryPendingAlerts(): Promise<PinAlertStatus> {
-    if (!backendAvailable()) return 'not_configured';
+  async retryPendingAlerts(accountId: string): Promise<PinAlertStatus> {
+    if (!backendAvailable() || !supabase) return 'not_configured';
     try {
+      const { data, error } = await supabase
+        .from('pin_security_alert_events')
+        .select('kind,status,attempt_count,claimed_at,next_retry_at,event_at')
+        .eq('account_id', accountId)
+        .eq('kind', 'lockout')
+        .order('event_at', { ascending: false })
+        .limit(10);
+      if (error) return 'failed';
+
+      const now = Date.now();
+      const retryable = (data ?? []).some((raw) => {
+        const row = raw as Record<string, unknown>;
+        const eventAt = asTime(row.event_at as string | null | undefined);
+        if (eventAt == null || eventAt < now - 24 * 60 * 60 * 1000) return false;
+
+        const status = String(row.status ?? '');
+        if (status === 'sending') {
+          const claimedAt = asTime(row.claimed_at as string | null | undefined);
+          if (claimedAt == null || claimedAt > now - 2 * 60 * 1000) return false;
+        } else if (status !== 'pending' && status !== 'failed') {
+          return false;
+        }
+
+        if (asCount(row.attempt_count) >= 5) return false;
+        const retryAt = asTime(row.next_retry_at as string | null | undefined);
+        return retryAt == null || retryAt <= now;
+      });
+      if (!retryable) return 'skipped';
+
       const invocation = await invokeAlert({ retry: true });
       if (!invocation.error && invocation.data?.ok) {
         return invocation.data.deduplicated ? 'deduplicated' : 'accepted';

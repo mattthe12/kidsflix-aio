@@ -171,7 +171,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         // If a previous lockout alert failed (or the app closed before the
         // request finished), the server retries only an eligible event after
         // its backoff. The event id prevents duplicate emails.
-        void pinSecurity.retryPendingAlerts();
+        void pinSecurity.retryPendingAlerts(user.id);
       } catch (err) {
         console.warn('[sproutscreen] boot failed', err);
       } finally {
