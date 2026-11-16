@@ -32,6 +32,10 @@ export function HomeScreen() {
   const contentWidth = responsive.contentWidth;
 
   const visible = useMemo(() => allTitles.filter(canWatch), [canWatch]);
+  const categories = useMemo(
+    () => CATEGORIES.filter((cat) => visible.some((title) => title.category === cat.id)),
+    [visible]
+  );
   const featured = useMemo(() => {
     const list = FEATURED.filter(canWatch);
     return list.length ? list : visible.slice(0, 3);
@@ -182,7 +186,7 @@ export function HomeScreen() {
       <View style={styles.exploreBlock}>
         <Text style={styles.exploreTitle}>✨ {t('funZone')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: responsive.gutter, gap: 12 }}>
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <Pressable
               key={cat.id}
               onPress={() => nav.push({ name: 'category', category: cat.id })}

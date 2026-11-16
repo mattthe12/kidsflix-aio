@@ -16,6 +16,10 @@ export function ShowsScreen() {
   const [filter, setFilter] = useState<CategoryId | 'all'>('all');
 
   const visible = useMemo(() => allTitles.filter(canWatch), [canWatch]);
+  const categories = useMemo(
+    () => CATEGORIES.filter((cat) => visible.some((title) => title.category === cat.id)),
+    [visible]
+  );
   const items = useMemo(
     () =>
       [...visible]
@@ -38,7 +42,7 @@ export function ShowsScreen() {
       </Pressable>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.catRow}>
-        {CATEGORIES.map((cat) => (
+        {categories.map((cat) => (
           <Pressable
             key={cat.id}
             onPress={() => nav.push({ name: 'category', category: cat.id })}
@@ -55,13 +59,13 @@ export function ShowsScreen() {
       <View style={styles.filters}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
           <Chip label="Everything" emoji="✨" active={filter === 'all'} onPress={() => setFilter('all')} />
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <Chip key={cat.id} label={cat.name} emoji={cat.emoji} active={filter === cat.id} onPress={() => setFilter(cat.id)} />
           ))}
         </ScrollView>
       </View>
 
-      <Text style={styles.count}>{items.length} titles for {filter === 'all' ? 'you' : CATEGORIES.find((c) => c.id === filter)?.name.toLowerCase()}</Text>
+      <Text style={styles.count}>{items.length} titles for {filter === 'all' ? 'you' : categories.find((c) => c.id === filter)?.name.toLowerCase()}</Text>
 
       <TitleGrid
         items={items}

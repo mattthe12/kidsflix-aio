@@ -3,7 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { Screen, PageHeader, EmptyState } from '../components/Screen';
 import { Chip } from '../components/BigButton';
 import { TitleGrid } from '../components/Rails';
-import { CATEGORIES, searchCatalog, suggestedQueries } from '../data/catalog';
+import { CATEGORIES, allTitles, searchCatalog, suggestedQueries } from '../data/catalog';
 import { colors, font, radius } from '../theme';
 import { useApp } from '../state/AppProvider';
 import { useNav } from '../nav';
@@ -46,6 +46,10 @@ export function SearchScreen() {
   const results = useMemo(
     () => searchCatalog(query, category).filter(canWatch),
     [query, category, canWatch]
+  );
+  const categories = useMemo(
+    () => CATEGORIES.filter((cat) => allTitles.some((title) => title.category === cat.id && canWatch(title))),
+    [canWatch]
   );
 
   const suggestions = useMemo(() => {
@@ -126,7 +130,7 @@ export function SearchScreen() {
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
         <Chip label="All" active={category === 'all'} onPress={() => setCategory('all')} />
-        {CATEGORIES.map((cat) => (
+        {categories.map((cat) => (
           <Chip key={cat.id} label={cat.name} emoji={cat.emoji} active={category === cat.id} onPress={() => setCategory(cat.id)} />
         ))}
       </ScrollView>
