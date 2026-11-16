@@ -136,19 +136,22 @@ export function AdminDashboardScreen() {
     setHealthBusy(false);
   }, []);
 
+  const loadAudit = useCallback(async () => {
+    if (!supabase) return;
+    const { data } = await supabase
+      .from('admin_actions')
+      .select('action,created_at')
+      .order('created_at', { ascending: false })
+      .limit(8);
+    setAudit((data ?? []) as { action: string; created_at: string }[]);
+  }, []);
+
   useEffect(() => {
     void loadOverview();
     void loadHealth();
     void loadUsers('');
-    if (supabase) {
-      void supabase
-        .from('admin_actions')
-        .select('action,created_at')
-        .order('created_at', { ascending: false })
-        .limit(8)
-        .then(({ data }) => setAudit((data ?? []) as { action: string; created_at: string }[]));
-    }
-  }, [loadHealth, loadOverview, loadUsers]);
+    void loadAudit();
+  }, [loadAudit, loadHealth, loadOverview, loadUsers]);
 
   const setSuspended = async (row: AdminUserRow) => {
     setPendingSuspend(null);
@@ -221,6 +224,7 @@ export function AdminDashboardScreen() {
     setNewPassword('');
     setConfirmPassword('');
     setPasswordNotice('Administrator password changed. Use the new password the next time you sign in.');
+    await loadAudit();
   };
 
   const closePasswordSheet = () => {
