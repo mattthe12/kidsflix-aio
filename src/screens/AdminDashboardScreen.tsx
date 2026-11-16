@@ -13,12 +13,15 @@ import {
 } from 'react-native';
 import { Screen, Card } from '../components/Screen';
 import { Logo } from '../components/Logo';
+import { Sheet } from '../components/Sheet';
+import { TextField } from '../components/TextField';
 import { BigButton, Chip } from '../components/BigButton';
 import { allTitles } from '../data/catalog';
 import { colors, font, radius } from '../theme';
 import { useApp } from '../state/AppProvider';
 import { AdminContentScreen } from './AdminContentScreen';
 import { supabase } from '../lib/supabase';
+import { adminPasswordError } from '../lib/authRules';
 import {
   addAdminAccount,
   removeAdminAccount,
@@ -76,7 +79,7 @@ function SectionTitle({ title, body }: { title: string; body?: string }) {
 }
 
 export function AdminDashboardScreen() {
-  const { admin, account, signOut } = useApp();
+  const { admin, account, signOut, changePassword } = useApp();
   const { width } = useWindowDimensions();
   const compact = width < 420;
   const [tab, setTab] = useState<AdminTab>('overview');
@@ -97,6 +100,13 @@ export function AdminDashboardScreen() {
   const [adminBusy, setAdminBusy] = useState(false);
   const [removeBusy, setRemoveBusy] = useState(false);
   const [actionNotice, setActionNotice] = useState('');
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordBusy, setPasswordBusy] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordNotice, setPasswordNotice] = useState('');
   const [audit, setAudit] = useState<{ action: string; created_at: string }[]>([]);
 
   const loadOverview = useCallback(async () => {
@@ -185,6 +195,42 @@ export function AdminDashboardScreen() {
     setPendingRemove(null);
     await loadUsers(userSearch);
     await loadOverview();
+  };
+
+  const submitPasswordChange = async () => {
+    if (passwordBusy) return;
+    setPasswordError('');
+    setPasswordNotice('');
+    if (!currentPassword) {
+      setPasswordError('Enter your current administrator password.');
+      return;
+    }
+    const validation = adminPasswordError(newPassword, confirmPassword);
+    if (validation) {
+      setPasswordError(validation);
+      return;
+    }
+    setPasswordBusy(true);
+    const result = await changePassword(currentPassword, newPassword);
+    setPasswordBusy(false);
+    if (!result.ok) {
+      setPasswordError(result.message);
+      return;
+    }
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordNotice('Administrator password changed. Use the new password the next time you sign in.');
+  };
+
+  const closePasswordSheet = () => {
+    if (passwordBusy) return;
+    setPasswordOpen(false);
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    setPasswordNotice('');
   };
 
   const openApp = (url: string) => {
@@ -440,9 +486,30 @@ export function AdminDashboardScreen() {
           <Text style={styles.adminTag}>🛡️ ADMINISTRATOR</Text>
           <Text style={styles.username} numberOfLines={1}>@{admin?.username ?? 'admin'} · {account?.email ?? ''}</Text>
         </View>
-        <Pressable onPress={() => void signOut()} accessibilityRole="button" style={styles.signOut}>
-          <Text style={styles.signOutText}>Sign out</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => {
+              if (passwordOpen) {
+                closePasswordSheet();
+              } else {
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                setPasswordError('');
+                setPasswordNotice('');
+                setPasswordOpen(true);
+              }
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Change your administrator password"
+            style={styles.signOut}
+          >
+            <Text style={styles.signOutText}>{passwordOpen ? 'Close' : 'Password'}</Text>
+          </Pressable>
+          <Pressable onPress={() => void signOut()} accessibilityRole="button" style={styles.signOut}>
+            <Text style={styles.signOutText}>Sign out</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabs} contentContainerStyle={styles.tabsInner}>
@@ -456,6 +523,79 @@ export function AdminDashboardScreen() {
       {tab === 'content' ? renderContent() : null}
       {tab === 'testing' ? renderTesting() : null}
       {tab === 'health' ? renderHealth() : null}
+
+      <Sheet
+        visible={passwordOpen}
+        onClose={closePasswordSheet}
+        title="Change administrator password"
+      >
+        <Text style={styles.mutedLine}>
+          Confirm your current password, then choose a new one. This changes only your administrator sign-in; parent
+          accounts, kid profiles and their data stay exactly as they are.
+        </Text>
+        <View style={{ height: 12 }} />
+        <TextField
+          label="Current administrator password"
+          icon="🔒"
+          value={currentPassword}
+          onChangeText={(value) => {
+            setCurrentPassword(value);
+            setPasswordError('');
+            setPasswordNotice('');
+          }}
+          secure
+          placeholder="Your current password"
+          autoCapitalize="none"
+          autoComplete="current-password"
+        />
+        <TextField
+          label="New administrator password"
+          icon="🔐"
+          value={newPassword}
+          onChangeText={(value) => {
+            setNewPassword(value);
+            setPasswordError('');
+            setPasswordNotice('');
+          }}
+          secure
+          placeholder="At least 8 characters"
+          autoCapitalize="none"
+          autoComplete="new-password"
+          helper={`${newPassword.length}/8 minimum`}
+        />
+        <TextField
+          label="Confirm new password"
+          icon="🔐"
+          value={confirmPassword}
+          onChangeText={(value) => {
+            setConfirmPassword(value);
+            setPasswordError('');
+            setPasswordNotice('');
+          }}
+          secure
+          placeholder="Type the new password again"
+          autoCapitalize="none"
+          autoComplete="new-password"
+          onSubmitEditing={() => void submitPasswordChange()}
+        />
+        {passwordError ? <Text style={styles.error}>😕 {passwordError}</Text> : null}
+        {passwordNotice ? <Text style={styles.notice}>✅ {passwordNotice}</Text> : null}
+        <BigButton
+          label={passwordBusy ? 'Changing password…' : 'Change password'}
+          icon={passwordBusy ? undefined : '✨'}
+          onPress={() => void submitPasswordChange()}
+          disabled={passwordBusy || !currentPassword || !newPassword || !confirmPassword}
+          size="sm"
+        />
+        <View style={{ height: 10 }} />
+        <BigButton
+          label="Cancel"
+          variant="soft"
+          onPress={closePasswordSheet}
+          disabled={passwordBusy}
+          size="sm"
+        />
+      </Sheet>
     </Screen>
   );
 }
@@ -464,6 +604,7 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 24, paddingTop: 24, maxWidth: 1080, width: '100%', alignSelf: 'center' },
   contentCompact: { paddingHorizontal: 16, paddingTop: 18 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 20 },
+  headerActions: { gap: 8, alignItems: 'flex-end' },
   adminTag: { fontFamily: font.bold, fontSize: 11, letterSpacing: 0.8, color: colors.yellow, marginTop: 10 },
   username: { fontFamily: font.body, fontSize: 12, color: colors.textDim, marginTop: 4 },
   signOut: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: 14, paddingVertical: 9 },
