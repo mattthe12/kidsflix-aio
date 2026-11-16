@@ -197,7 +197,7 @@ offline playback, use Mux's offline SDK/DRM instead.
 
 | Creator | Clips | Licence |
 | --- | --- | --- |
-| Blender Foundation | Big Buck Bunny, Caminandes 1–3, Spring, Wing It! | CC BY 3.0 / 4.0 |
+| Blender Foundation | Big Buck Bunny, Caminandes 1–3, Spring, Wing It!, Hero, Coffee Run, Glass Half | CC BY 3.0 / 4.0 |
 | Ub Iwerks / Celebrity Pictures | Jack and the Beanstalk, Puss in Boots, Jack Frost, The Valiant Tailor, The Three Bears, Simple Simon, The Queen of Hearts, Balloon Land, Mary's Little Lamb, The Bremen Town Musicians, Don Quixote, The Brave Tin Soldier, Summertime, Happy Days, Tom Thumb, Dick Whittington's Cat | Public domain |
 | NASA | Earth Views from the ISS, STEMonstrations: Moon Phases, GPM Water Cycle, The Aurora Named STEVE, TROPICS Rocket Launch | Public domain |
 | NOAA Ocean Exploration | Octopus Friday on Saturday, Grumpy Goosefish, Twirling Jelly, Sea Lion Cave, Deep-Sea Underdogs | Public domain |
