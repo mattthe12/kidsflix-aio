@@ -147,7 +147,7 @@ export function AuthScreen({ initialMode, onBack }: { initialMode: Mode; onBack:
                 icon="✉️"
                 value={email}
                 onChangeText={setEmail}
-                placeholder={isRecover ? 'grownup@example.com' : 'grownup@example.com or admin'}
+                placeholder={isRecover ? 'grownup@example.com' : 'grownup@example.com or username'}
                 keyboardType={email.includes('@') || isRecover ? 'email-address' : 'default'}
                 autoCapitalize="none"
                 autoCorrect={false}
